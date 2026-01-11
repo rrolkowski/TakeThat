@@ -2,16 +2,17 @@ using UnityEngine;
 
 public class CardView : MonoBehaviour
 {
-    public int DebugId { get; private set; }
+    public CardId Card { get; private set; }
 
-    public void Init(int id, Sprite sprite)
+    public void Init(CardId card, Sprite sprite)
     {
-        DebugId = id;
+        Card = card;
         GetComponent<SpriteRenderer>().sprite = sprite;
     }
 
     public void OnClicked()
     {
-        Debug.Log($"Clicked card {DebugId}");
+        if (GameSession.Instance == null) return;
+        GameSession.Instance.Server_RequestPlay(Card);
     }
 }

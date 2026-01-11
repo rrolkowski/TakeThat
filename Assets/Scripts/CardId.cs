@@ -1,7 +1,11 @@
 using System;
 using UnityEngine;
 
-public enum Suit { Red, Black }
+public enum Suit
+{
+    Green,
+    Purple
+}
 
 [Serializable]
 public struct CardId

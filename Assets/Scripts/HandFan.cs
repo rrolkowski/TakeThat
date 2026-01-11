@@ -1,21 +1,23 @@
+using System.Collections.Generic;
 using UnityEngine;
 
-public class HandFan_Debug : MonoBehaviour
+public class HandFan : MonoBehaviour
 {
     [SerializeField] private CardView cardPrefab;
     [SerializeField] private Transform root;
-    [SerializeField] private Sprite[] testSprites;
 
     [SerializeField] private float radius = 3.0f;
     [SerializeField] private float angleRange = 35f;
 
-    private void Start()
-    {
-        SpawnTestHand(7);
-    }
+    private readonly List<CardView> spawned = new();
 
-    private void SpawnTestHand(int count)
+    public void SetHand(CardId[] hand, System.Func<CardId, Sprite> spriteProvider)
     {
+        Clear();
+
+        int count = hand.Length;
+        if (count == 0) return;
+
         for (int i = 0; i < count; i++)
         {
             float t = count == 1 ? 0.5f : i / (float)(count - 1);
@@ -29,8 +31,17 @@ public class HandFan_Debug : MonoBehaviour
             c.transform.localPosition = pos;
             c.transform.localRotation = rot;
 
-            var sprite = testSprites.Length > 0 ? testSprites[i % testSprites.Length] : null;
-            c.Init(i, sprite);
+            c.Init(hand[i], spriteProvider(hand[i]));
+            spawned.Add(c);
         }
     }
+
+    private void Clear()
+    {
+        for (int i = 0; i < spawned.Count; i++)
+            Destroy(spawned[i].gameObject);
+
+        spawned.Clear();
+    }
 }
+
