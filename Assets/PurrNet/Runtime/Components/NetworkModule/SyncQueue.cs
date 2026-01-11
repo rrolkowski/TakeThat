@@ -21,6 +21,15 @@ namespace PurrNet
         public bool ownerAuth => _ownerAuth;
         public int Count => _queue.Count;
 
+        public override void OnPoolReset()
+        {
+            onChanged = null;
+
+#if UNITY_EDITOR
+            onChanged += UpdateSerializedQueue;
+#endif
+        }
+
         public SyncQueue(bool ownerAuth = false)
         {
             _ownerAuth = ownerAuth;
@@ -182,7 +191,14 @@ namespace PurrNet
 
         private void InvokeChange(SyncQueueChange<T> change)
         {
-            onChanged?.Invoke(change);
+            try
+            {
+                onChanged?.Invoke(change);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
         }
 
         #region Initial State Handling

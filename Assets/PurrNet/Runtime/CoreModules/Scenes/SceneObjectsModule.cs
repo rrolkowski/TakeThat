@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.SceneManagement;
 
 namespace PurrNet.Modules
@@ -16,12 +17,13 @@ namespace PurrNet.Modules
         {
             onPreSceneLoad?.Invoke(scene);
 
-            var rootGameObjects = scene.GetRootGameObjects();
+            IList<GameObject> rootGameObjects = scene.GetRootGameObjects();
 
             PurrSceneInfo sceneInfo = null;
 
-            foreach (var rootObject in rootGameObjects)
+            for (var i = 0; i < rootGameObjects.Count; i++)
             {
+                var rootObject = rootGameObjects[i];
                 if (rootObject.TryGetComponent<PurrSceneInfo>(out var si))
                 {
                     sceneInfo = si;
@@ -30,9 +32,9 @@ namespace PurrNet.Modules
             }
 
             if (sceneInfo)
-                rootGameObjects = sceneInfo.rootGameObjects.ToArray();
+                rootGameObjects = sceneInfo.rootGameObjects;
 
-            for (var i = 0; i < rootGameObjects.Length; i++)
+            for (var i = 0; i < rootGameObjects.Count; i++)
             {
                 var rootObject = rootGameObjects[i];
 

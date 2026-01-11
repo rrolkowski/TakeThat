@@ -93,9 +93,9 @@ namespace PurrNet.Packing
 
             if (hasChanged)
             {
-                value.x = DeltaPacker<int>.ReadSimple(packer, oldvalue.x);
-                value.y = DeltaPacker<int>.ReadSimple(packer, oldvalue.y);
-                value.z = DeltaPacker<int>.ReadSimple(packer, oldvalue.z);
+                value.x = DeltaPacker<int>.Read(packer, oldvalue.x);
+                value.y = DeltaPacker<int>.Read(packer, oldvalue.y);
+                value.z = DeltaPacker<int>.Read(packer, oldvalue.z);
             }
             else value = oldvalue;
         }
@@ -162,73 +162,6 @@ namespace PurrNet.Packing
                 DeltaPacker<float>.Read(packer, oldvalue.y, ref value.y);
                 DeltaPacker<float>.Read(packer, oldvalue.z, ref value.z);
                 DeltaPacker<float>.Read(packer, oldvalue.w, ref value.w);
-            }
-            else value = oldvalue;
-        }
-
-        [UsedByIL]
-        public static void Write(this BitPacker packer, HalfQuaternion value)
-        {
-            value.Normalize();
-
-            Packer<Half>.Write(packer, value.x);
-            Packer<Half>.Write(packer, value.y);
-            Packer<Half>.Write(packer, value.z);
-
-            packer.Write(value.w < 0);
-        }
-
-        [UsedByIL]
-        public static void Read(this BitPacker packer, ref HalfQuaternion value)
-        {
-            Half x = default;
-            Half y = default;
-            Half z = default;
-
-            Packer<Half>.Read(packer, ref x);
-            Packer<Half>.Read(packer, ref y);
-            Packer<Half>.Read(packer, ref z);
-
-            bool wSign = false;
-            packer.Read(ref wSign);
-
-            var w = (Half)Mathf.Sqrt(Mathf.Max(0, 1 - x * x - y * y - z * z));
-
-            if (wSign)
-                w = -w;
-
-            value = new HalfQuaternion(x, y, z, w);
-        }
-
-        [UsedByIL]
-        private static bool WriteQuaternion(BitPacker packer, HalfQuaternion oldvalue, HalfQuaternion newvalue)
-        {
-            var flagPos = packer.AdvanceBits(1);
-            bool hasChanged;
-
-            hasChanged = DeltaPacker<Half>.Write(packer, oldvalue.x, newvalue.x);
-            hasChanged = DeltaPacker<Half>.Write(packer, oldvalue.y, newvalue.y) || hasChanged;
-            hasChanged = DeltaPacker<Half>.Write(packer, oldvalue.z, newvalue.z) || hasChanged;
-            hasChanged = DeltaPacker<Half>.Write(packer, oldvalue.w, newvalue.w) || hasChanged;
-
-            packer.WriteAt(flagPos, hasChanged);
-            if (!hasChanged)
-                packer.SetBitPosition(flagPos + 1);
-            return hasChanged;
-        }
-
-        [UsedByIL]
-        private static void ReadQuaternion(BitPacker packer, HalfQuaternion oldvalue, ref HalfQuaternion value)
-        {
-            bool hasChanged = default;
-            Packer<bool>.Read(packer, ref hasChanged);
-
-            if (hasChanged)
-            {
-                DeltaPacker<Half>.Read(packer, oldvalue.x, ref value.x);
-                DeltaPacker<Half>.Read(packer, oldvalue.y, ref value.y);
-                DeltaPacker<Half>.Read(packer, oldvalue.z, ref value.z);
-                DeltaPacker<Half>.Read(packer, oldvalue.w, ref value.w);
             }
             else value = oldvalue;
         }

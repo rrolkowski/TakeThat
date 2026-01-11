@@ -14,6 +14,7 @@ namespace PurrNet
         [Range(0.05f, 1f)] public float checkInterval = 0.33f;
         [SerializeField] private StatisticsPlacement placement = StatisticsPlacement.None;
         [SerializeField] private StatisticsDisplayType _displayType = StatisticsDisplayType.Ping | StatisticsDisplayType.Usage;
+        [SerializeField] private StatisticsDisplayTarget _displayTarget = StatisticsDisplayTarget.Editor | StatisticsDisplayTarget.Build;
         [SerializeField] private float fontSize = 13f;
         [SerializeField] private Color textColor = Color.white;
 
@@ -143,6 +144,13 @@ namespace PurrNet
 
         private void OnGUI()
         {
+#if UNITY_EDITOR
+            if (!_displayTarget.HasFlag(StatisticsDisplayTarget.Editor))
+                return;
+#else
+            if (!_displayTarget.HasFlag(StatisticsDisplayTarget.Build))
+                return;
+#endif
             if (placement == StatisticsPlacement.None || !connectedClient)
                 return;
 
@@ -569,6 +577,13 @@ namespace PurrNet
             Usage = 1 << 1,
             ServerStats = 1 << 2,
             Version = 1 << 3,
+        }
+
+        [Flags]
+        public enum StatisticsDisplayTarget
+        {
+            Editor = 1 << 1,
+            Build = 1 << 2,
         }
     }
 }

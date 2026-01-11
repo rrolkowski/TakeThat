@@ -17,7 +17,7 @@ namespace PurrNet.Modules
         }
     }
 
-    public class NetworkTransformModule : INetworkModule
+    public class NetworkTransformModule : INetworkModule, IPromoteToServerModule
     {
         private readonly List<NetworkTransform> _networkTransforms = new();
         private readonly ScenePlayersModule _scenePlayers;
@@ -37,10 +37,18 @@ namespace PurrNet.Modules
             _factory = factory;
         }
 
+        public void PromoteToServerModule()
+        {
+            _asServer = true;
+        }
+
+        public void PostPromoteToServerModule()
+        {
+        }
+
         public void Enable(bool asServer)
         {
             _asServer = asServer;
-
             _broadcaster.Subscribe<NetworkTransformDelta>(OnNetworkTransformDelta);
         }
 
@@ -58,15 +66,17 @@ namespace PurrNet.Modules
 
             packet.ResetPositionAndMode(true);
 
-            PackedInt ntCount = default;
+            int ntCount = default;
             NetworkID lastNid = default;
+            PackedInt lastLen = default;
 
-            Packer<PackedInt>.Read(packet, ref ntCount);
+            Packer<int>.Read(packet, ref ntCount);
 
             for (var i = 0; i < ntCount; i++)
             {
                 PackedInt length = default;
-                Packer<PackedInt>.Read(packet, ref length);
+                DeltaPacker<PackedInt>.Read(packet, lastLen, ref length);
+                lastLen = length;
                 DeltaPacker<NetworkID>.Read(packet, lastNid, ref lastNid);
 
                 if (_factory.TryGetIdentity(_scene, lastNid, out var identity) && identity is NetworkTransform nt &&
@@ -92,8 +102,52 @@ namespace PurrNet.Modules
             bool anyWritten = false;
 
             var controlled = ListPool<NetworkTransform>.Instantiate();
-            using var dummy = BitPackerPool.Get();
 
+            GatherCandidates(player, ntCount, localPlayer, controlled);
+
+            NetworkID lastNid = default;
+            int count = controlled.Count;
+            var countPos = packer.positionInBits;
+
+            int writtenCount = 0;
+            PackedInt lastLen = default;
+            Packer<int>.Write(packer, 0);
+
+            using var tmp = BitPackerPool.Get();
+
+            for (var i = 0; i < count; i++)
+            {
+                var nt = controlled[i];
+                nt.DeltaWrite(tmp);
+                anyWritten = true;
+
+                PackedInt length = tmp.positionInBits;
+
+                tmp.ResetPositionAndMode(true);
+
+                DeltaPacker<PackedInt>.Write(packer, lastLen, length);
+                lastLen = length;
+                DeltaPacker<NetworkID>.Write(packer, lastNid, nt.id!.Value);
+                packer.WriteBits(tmp, length);
+
+                tmp.ResetPositionAndMode(false);
+
+                lastNid = nt.id.Value;
+                writtenCount += 1;
+            }
+
+            var lastPos = packer.positionInBits;
+            packer.SetBitPosition(countPos);
+            Packer<int>.Write(packer, writtenCount);
+            packer.SetBitPosition(lastPos);
+
+            ListPool<NetworkTransform>.Destroy(controlled);
+
+            return anyWritten;
+        }
+
+        private void GatherCandidates(PlayerID player, int ntCount, PlayerID localPlayer, List<NetworkTransform> controlled)
+        {
             if (player == PlayerID.Server)
             {
                 for (var i = 0; i < ntCount; i++)
@@ -103,7 +157,7 @@ namespace PurrNet.Modules
                     if (!nt.IsSpawned(_asServer) || !nt.id.HasValue)
                         continue;
 
-                    if (nt.IsControlling(localPlayer, false))
+                    if (nt.IsControlling(localPlayer, false) && nt.HasChanges())
                         controlled.Add(nt);
                 }
             }
@@ -116,34 +170,10 @@ namespace PurrNet.Modules
                     if (!nt.IsSpawned(_asServer) || !nt.id.HasValue)
                         continue;
 
-                    if (!nt.IsControlling(player, false) && nt.IsObserver(player))
+                    if (!nt.IsControlling(player, false) && nt.IsObserver(player) && nt.HasChanges())
                         controlled.Add(nt);
                 }
             }
-
-            NetworkID lastNid = default;
-            int count = controlled.Count;
-            Packer<PackedInt>.Write(packer, count);
-            for (var i = 0; i < count; i++)
-            {
-                var nt = controlled[i];
-                using var tmp = BitPackerPool.Get();
-
-                anyWritten = nt.DeltaWrite(tmp) || anyWritten;
-
-                PackedInt length = tmp.positionInBits;
-                tmp.ResetPositionAndMode(true);
-
-                Packer<PackedInt>.Write(packer, length);
-                DeltaPacker<NetworkID>.Write(packer, lastNid, nt.id!.Value);
-                packer.WriteBits(tmp, length);
-
-                lastNid = nt.id.Value;
-            }
-
-            ListPool<NetworkTransform>.Destroy(controlled);
-
-            return anyWritten;
         }
 
         public void Register(NetworkTransform networkTransform)

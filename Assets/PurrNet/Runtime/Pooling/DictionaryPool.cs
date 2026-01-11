@@ -23,11 +23,18 @@ namespace PurrNet.Pooling
 #if UNITY_EDITOR
             _instance ??= new DictionaryPool<TKey, TValue>();
 #endif
-            return _instance.Allocate();
+            var allocated = _instance.Allocate();
+#if UNITY_EDITOR && PURR_LEAKS_CHECK
+            AllocationTracker.Track(allocated);
+#endif
+            return allocated;
         }
 
         public static void Destroy(Dictionary<TKey, TValue> list)
         {
+#if UNITY_EDITOR && PURR_LEAKS_CHECK
+            AllocationTracker.UnTrack(list);
+#endif
             _instance ??= new DictionaryPool<TKey, TValue>();
             _instance.Delete(list);
         }

@@ -21,7 +21,7 @@ namespace PurrNet.Packing
 
         public static long ZigzagDecode(ulong i) => ((long)(i >> 1) & 0x7FFFFFFFFFFFFFFFL) ^ ((long)(i << 63) >> 63);
 
-        static int CountLeadingZeroBits(ulong value)
+        public static int CountLeadingZeroBits(ulong value)
         {
             if (value == 0) return 64; // Special case for zero
 
@@ -122,80 +122,9 @@ namespace PurrNet.Packing
             value = new PackedShort((short)ZigzagDecode(packed.value));
         }
 
-        private const int SEGMENTS = 16*2;
+        private const int SEGMENTS = 1 << 5;
         const int TOTAL_BITS = 64;
         const int CHUNK = TOTAL_BITS / SEGMENTS;
-
-        public static void WriteSmallSegmented(BitPacker packer, long value, byte segmentedBits, byte maxBits)
-        {
-            ulong packedValue = ZigzagEncode(value);
-            WriteSmallSegmented(packer, packedValue, segmentedBits, maxBits);
-        }
-
-        public static void WriteSmallSegmented(BitPacker packer, ulong value, byte segmentedBits, byte maxBits)
-        {
-            if (value == 0) {
-                packer.WriteBits(0, 1); // Just 1 bit for zero
-                return;
-            }
-            if (value == 1) {
-                packer.WriteBits(1, 1); // 1 bit for one
-                packer.WriteBits(0, 1);
-                return;
-            }
-            packer.WriteBits(1, 1); // Signal non-zero/one
-            packer.WriteBits(1, 1); // Signal larger value
-            WriteSegmented(packer, value - 2, segmentedBits, maxBits); // Offset and use segments
-        }
-
-        public static void ReadSmallSegmented(BitPacker packer, ref long value, byte segmentedBits, byte maxBits)
-        {
-            ulong packedValue = 0;
-            ReadSmallSegmented(packer, ref packedValue, segmentedBits, maxBits);
-            value = ZigzagDecode(packedValue);
-        }
-
-        public static void ReadSmallSegmented(BitPacker packer, ref ulong value, byte segmentedBits, byte maxBits)
-        {
-            // Read first bit
-            if (packer.ReadBits(1) == 0)
-            {
-                // Value is 0
-                value = 0;
-                return;
-            }
-
-            // Read second bit
-            if (packer.ReadBits(1) == 0)
-            {
-                // Value is 1
-                value = 1;
-                return;
-            }
-
-            // Value is larger than 1
-            ulong result = 0;
-            ReadSegmented(packer, ref result, segmentedBits, maxBits);
-            value = result + 2; // Add back the offset
-        }
-
-        public static void WriteSegmented(BitPacker packer, long value, byte segments, byte maxBits)
-        {
-            ulong packedValue = ZigzagEncode(value);
-            WriteSegmented(packer, packedValue, segments, maxBits);
-        }
-
-        static readonly ulong[] _masks = {
-            0x00000000UL, 0x00000001UL, 0x00000003UL, 0x00000007UL,
-            0x0000000fUL, 0x0000001fUL, 0x0000003fUL, 0x0000007fUL,
-            0x000000ffUL, 0x000001ffUL, 0x000003ffUL, 0x000007ffUL,
-            0x00000fffUL, 0x00001fffUL, 0x00003fffUL, 0x00007fffUL,
-            0x0000ffffUL, 0x0001ffffUL, 0x0003ffffUL, 0x0007ffffUL,
-            0x000fffffUL, 0x001fffffUL, 0x003fffffUL, 0x007fffffUL,
-            0x00ffffffUL, 0x01ffffffUL, 0x03ffffffUL, 0x07ffffffUL,
-            0x0fffffffUL, 0x1fffffffUL, 0x3fffffffUL, 0x7fffffffUL,
-            0xffffffffUL
-        };
 
         public static void WritePrefixed(BitPacker packer, long value, byte maxBitCount)
         {
@@ -237,124 +166,81 @@ namespace PurrNet.Packing
             value = packer.ReadBits(bitCount);
         }
 
-        public static void WriteSegmented(BitPacker packer, ulong value, byte segments, byte maxBits)
-        {
-            int leftBitsToWrite = maxBits;
-
-            do
-            {
-                int currentSegmentLength = Mathf.Min(segments, leftBitsToWrite);
-                ulong mask = _masks[currentSegmentLength];
-
-                // Only write continuation bit if we have more segments to come
-                bool hasMoreSegments = leftBitsToWrite > currentSegmentLength;
-                if (hasMoreSegments) {
-                    ulong next = value >> currentSegmentLength;
-                    bool isLastSegment = next == 0;
-                    packer.WriteBits((byte)(isLastSegment ? 0 : 1), 1);
-
-                    // If this is the last segment (because value becomes 0), update our tracking
-                    if (isLastSegment) {
-                        hasMoreSegments = false;
-                    }
-                }
-
-                packer.WriteBits(value & mask, (byte)currentSegmentLength);
-                value >>= currentSegmentLength;
-                leftBitsToWrite -= currentSegmentLength;
-
-                if (!hasMoreSegments || leftBitsToWrite <= 0)
-                    break;
-            }
-            while (true);
-        }
-
-        public static void ReadSegmented(BitPacker packer, ref long value, byte segments, byte maxBits)
-        {
-            ulong packedValue = 0;
-            ReadSegmented(packer, ref packedValue, segments, maxBits);
-            value = ZigzagDecode(packedValue);
-        }
-
-        public static void ReadSegmented(BitPacker packer, ref ulong value, byte segments, byte maxBits)
-        {
-            ulong result = 0;
-            ulong multiplier = 1;
-            int leftBitsToRead = maxBits;
-
-            do
-            {
-                int currentSegmentLength = Mathf.Min(segments, leftBitsToRead);
-
-                // Only read continuation bit if we have more segments to come
-                bool hasMoreSegments = leftBitsToRead > currentSegmentLength;
-                bool continueReading = false;
-
-                if (hasMoreSegments) {
-                    continueReading = packer.ReadBits(1) == 1;
-                }
-
-                ulong chunk = packer.ReadBits((byte)currentSegmentLength);
-                result |= chunk * multiplier;
-                multiplier <<= currentSegmentLength;
-                leftBitsToRead -= currentSegmentLength;
-
-                if (!hasMoreSegments || !continueReading || leftBitsToRead <= 0)
-                    break;
-            } while (true);
-
-            value = result;
-        }
-
         [UsedByIL]
         public static void Write(BitPacker packer, PackedULong value)
         {
-            int trailingZeroes = CountLeadingZeroBits(value.value);
-            int emptyChunks = trailingZeroes / CHUNK;
-            int segmentCount = SEGMENTS - emptyChunks;
-            int pointer = 0;
-
-            if (segmentCount == 0)
+            ulong uvalue = value.value;
+            while (true)
             {
-                packer.WriteBits(0, 1);
-                return;
-            }
+                ulong chunk = uvalue & 0x7FUL;
+                uvalue >>= 7;
 
-            packer.WriteBits(1, 1);
+                if (uvalue == 0)
+                {
+                    packer.WriteBits(chunk, 7);
+                    packer.WriteBits(0, 1);
+                    break;
+                }
 
-            const ulong mask = (ulong.MaxValue >> (TOTAL_BITS - CHUNK));
-            while (segmentCount > 0 && pointer < TOTAL_BITS)
-            {
-                ulong isolated = (value.value >> pointer) & mask;
-                packer.WriteBits(isolated, CHUNK);
-                pointer += CHUNK;
-
-                --segmentCount;
-                packer.WriteBits(segmentCount == 0 ? 0u : 1u, 1);
+                packer.WriteBits(chunk, 7);
+                packer.WriteBits(1, 1);
             }
         }
 
         [UsedByIL]
         public static void Read(BitPacker packer, ref PackedULong value)
         {
-            if (packer.ReadBits(1) == 0)
+            ulong result = 0;
+            int shift = 0;
+
+            while (shift < 64)
             {
-                value.value = 0;
-                return;
+                ulong chunk = packer.ReadBits(7);
+                bool cont = packer.ReadBits(1) == 1;
+                result |= chunk << shift;
+                shift += 7;
+
+                if (!cont) break;
             }
 
-            ulong result = 0;
+            value.value = result;
+        }
+
+        [UsedByIL]
+        public static void Write(BitPacker packer, Size value)
+        {
+            int trailingZeroes = CountLeadingZeroBits(value.value);
+            int emptyChunks = trailingZeroes / CHUNK;
+            int segmentCount = SEGMENTS - emptyChunks;
+            int pointer = 0;
+
+            const uint mask = uint.MaxValue >> (32 - CHUNK);
+            do
+            {
+                uint isolated = (value.value >> pointer) & mask;
+                packer.WriteBits(isolated, CHUNK);
+                pointer += CHUNK;
+
+                --segmentCount;
+                packer.WriteBits(segmentCount <= 0 ? 0u : 1u, 1);
+            } while (segmentCount > 0 && pointer < 32);
+        }
+
+        [UsedByIL]
+        public static void Read(BitPacker packer, ref Size value)
+        {
+            uint result = 0;
             int pointer = 0;
             bool continueReading;
 
             do
             {
-                ulong chunk = packer.ReadBits(CHUNK);
+                uint chunk = (uint)packer.ReadBits(CHUNK);
                 result |= chunk << pointer;
                 pointer += CHUNK;
 
                 continueReading = packer.ReadBits(1) == 1;
-            } while (continueReading && pointer < TOTAL_BITS);
+            } while (continueReading && pointer < 32);
 
             value.value = result;
         }

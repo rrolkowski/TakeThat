@@ -12,11 +12,12 @@ namespace PurrNet.Editor
         private SerializedProperty _roomName;
         private SerializedProperty _region;
         private SerializedProperty _host;
+        private SerializedProperty _timeoutInSeconds;
         private SerializedProperty _pollEventsInUpdate;
 
         private bool _lookingForBestRegion;
-        static string[] _regions = Array.Empty<string>();
-        static string[] _hosts = Array.Empty<string>();
+        string[] _regions = Array.Empty<string>();
+        string[] _hosts = Array.Empty<string>();
 
         void OnEnable()
         {
@@ -24,14 +25,14 @@ namespace PurrNet.Editor
             _roomName = serializedObject.FindProperty("_roomName");
             _region = serializedObject.FindProperty("_region");
             _host = serializedObject.FindProperty("_host");
+            _timeoutInSeconds = serializedObject.FindProperty("_timeoutInSeconds");
             _pollEventsInUpdate = serializedObject.FindProperty("_pollEventsInUpdate");
 
-            if (_regions.Length == 0)
+            if (!EditorApplication.isPlayingOrWillChangePlaymode)
                 LoadRegions();
         }
 
-        public static string _bestRegion;
-        static bool _loadingRegions;
+        bool _loadingRegions;
 
         async void LoadRegions()
         {
@@ -41,7 +42,13 @@ namespace PurrNet.Editor
                     return;
 
                 _loadingRegions = true;
-                var servers = await PurrTransportUtils.GetRelayServersAsync(_masterServer.stringValue);
+                var servers = await PurrTransportUtils.ActualGetRelayServersAsync(_masterServer.stringValue);
+
+                if (servers.servers == null)
+                {
+                    _loadingRegions = false;
+                    return;
+                }
 
                 _hosts = new string[servers.servers.Length];
                 _regions = new string[servers.servers.Length];
@@ -61,7 +68,7 @@ namespace PurrNet.Editor
             }
         }
 
-        static int RegionId(string region, string host)
+        int RegionId(string region, string host)
         {
             for (var i = 0; i < _regions.Length; i++)
             {
@@ -85,11 +92,9 @@ namespace PurrNet.Editor
 
                 _lookingForBestRegion = true;
 
-                var server = await PurrTransportUtils.GetRelayServerAsync(_masterServer.stringValue, null);
+                var server = await PurrTransportUtils.ActualGetRelayServerAsync(_masterServer.stringValue);
 
                 _region.stringValue = server.region;
-                _bestRegion = server.region;
-
                 serializedObject.ApplyModifiedProperties();
 
                 _lookingForBestRegion = false;
@@ -101,18 +106,28 @@ namespace PurrNet.Editor
             }
         }
 
+        float _lastMasterServerUpdate;
+
         public override void OnInspectorGUI()
         {
             base.OnInspectorGUI();
 
-            EditorGUILayout.Space();
-
             var transport = (PurrTransport)target;
 
+            var oldMasterServer = _masterServer.stringValue;
             EditorGUILayout.PropertyField(_masterServer);
 
+            if (oldMasterServer != _masterServer.stringValue)
+                _lastMasterServerUpdate = Time.realtimeSinceStartup;
+
+            if (_lastMasterServerUpdate != 0 && Time.realtimeSinceStartup - _lastMasterServerUpdate > 1)
+            {
+                LoadRegions();
+                _lastMasterServerUpdate = 0;
+            }
+
             var server = _masterServer.stringValue;
-            if (Uri.TryCreate(server, UriKind.Absolute, out var url) && url.Host.EndsWith("riten.dev"))
+            if (Uri.TryCreate(server, UriKind.Absolute, out var url) && url.Host.EndsWith("purrtransport.purrservers.com"))
             {
                 // draw help box saying this is meant for dev use only
                 EditorGUILayout.HelpBox("This server is meant for development use only.\n" +
@@ -123,7 +138,7 @@ namespace PurrNet.Editor
             EditorGUILayout.PropertyField(_roomName);
 
             bool oldEnabled = GUI.enabled;
-            if (_lookingForBestRegion)
+            if (_lookingForBestRegion || _loadingRegions || _lastMasterServerUpdate != 0)
                 GUI.enabled = false;
 
             EditorGUILayout.BeginHorizontal();
@@ -164,7 +179,11 @@ namespace PurrNet.Editor
             GUI.color = Color.white;
             EditorGUILayout.EndHorizontal();
 
+            EditorGUILayout.PropertyField(_timeoutInSeconds);
             EditorGUILayout.PropertyField(_pollEventsInUpdate);
+
+            if (GUILayout.Button("Refresh"))
+                LoadRegions();
 
             TransportInspector.DrawTransportStatus(transport);
 

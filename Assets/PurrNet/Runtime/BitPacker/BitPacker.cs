@@ -61,7 +61,7 @@ namespace PurrNet.Packing
     }
 
     [UsedImplicitly]
-    public partial class BitPacker : IDisposable
+    public partial class BitPacker : IDisposable, IDuplicate<BitPacker>
     {
         private byte[] _buffer;
         private bool _isReading;
@@ -332,6 +332,13 @@ namespace PurrNet.Packing
         {
             EnsureBitsExist(bits);
             WriteBitsWithoutChecks(data, bits);
+        }
+
+        public bool WriteBit(bool data)
+        {
+            EnsureBitsExist(1);
+            WriteBitsWithoutChecks(data ? 1u : 0, 1);
+            return data;
         }
 
         public unsafe void WriteBitsWithoutChecks(ulong data, byte bits)
@@ -741,6 +748,15 @@ namespace PurrNet.Packing
                 bitsLeft -= bitsToWrite;
                 positionInBits += bitsToWrite;
             }
+        }
+
+        public BitPacker Duplicate()
+        {
+            var newPacker = BitPackerPool.Get();
+            int len = length;
+            newPacker.EnsureBitsExist(len * 8);
+            Array.Copy(_buffer, newPacker.buffer, len);
+            return newPacker;
         }
     }
 }

@@ -5,9 +5,9 @@ namespace PurrNet
 {
     public readonly struct SceneID : IEquatable<SceneID>, IPackedAuto
     {
-        private PackedUShort _id { get; }
+        private Size _id { get; }
 
-        public PackedUShort id => _id;
+        public Size id => _id;
 
         public SceneID(ushort id)
         {

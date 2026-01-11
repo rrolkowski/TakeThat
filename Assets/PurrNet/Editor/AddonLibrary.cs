@@ -250,7 +250,11 @@ namespace PurrNet.Editor
         {
             // Implement the logic to update the manifest file with the given gitUrl
             if (addon.asManifest)
+            {
+                if (!GitHelper.CheckGit())
+                    return;
                 AddAddon_Manifest(addon);
+            }
             else
                 AddAddon_Assets(addon);
         }

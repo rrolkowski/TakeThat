@@ -27,6 +27,9 @@ namespace PurrNet.Codegen
             if (method.Parameters[2].ParameterType.IsByReference)
                 return false;
 
+            if (method.Parameters[2].ParameterType != method.Parameters[1].ParameterType)
+                return false;
+
             type = method.Parameters[1].ParameterType;
             return true;
         }
@@ -94,7 +97,7 @@ namespace PurrNet.Codegen
             public MethodDefinition method;
         }
 
-        public static void HandleType(ModuleDefinition module, TypeDefinition type, bool isEditor,
+        public static void HandleType(ModuleDefinition module, TypeDefinition type,
             HashSet<TypeReference> toIgnoreForDelta, HashSet<TypeReference> toIgnoreForSerialization)
         {
             if (type.FullName == typeof(Packer).FullName)
@@ -192,10 +195,22 @@ namespace PurrNet.Codegen
             var registerMethod = new MethodDefinition("Register_Type_Generated_PurrNet", MethodAttributes.Static,
                 module.TypeSystem.Void);
 
+            bool hasGeneratedByILAttribute = false;
+
+            foreach (var attribute in type.CustomAttributes)
+            {
+                if (attribute.AttributeType.FullName == typeof(GeneratedByILAttribute).FullName)
+                {
+                    hasGeneratedByILAttribute = true;
+                    break;
+                }
+            }
+
             var editorType = module.GetTypeDefinition<RegisterPackersAttribute>().Import(module);
-            var editorConstructor = editorType.Resolve().Methods.First(m => m.IsConstructor && !m.HasParameters)
+            var editorConstructor = editorType.Resolve().Methods.First(m => m.IsConstructor && m.HasParameters)
                 .Import(module);
             var editorAttribute = new CustomAttribute(editorConstructor);
+            editorAttribute.ConstructorArguments.Add(new CustomAttributeArgument(module.TypeSystem.Int32, hasGeneratedByILAttribute ? -1 : 0));
             registerMethod.CustomAttributes.Add(editorAttribute);
             registerMethod.Body.InitLocals = true;
 

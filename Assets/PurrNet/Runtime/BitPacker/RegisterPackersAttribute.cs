@@ -6,5 +6,15 @@ namespace PurrNet.Packing
     [AttributeUsage(AttributeTargets.Method)]
     public class RegisterPackersAttribute : PreserveAttribute
     {
+        public readonly int priority;
+
+        /// <summary>
+        /// Register packers
+        /// </summary>
+        /// <param name="priority">Higher priority means packer will be called first</param>
+        public RegisterPackersAttribute(int priority = 0)
+        {
+            this.priority = priority;
+        }
     }
 }

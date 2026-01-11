@@ -398,6 +398,7 @@ namespace PurrNet.Modules
                 using var current = queue.Dequeue();
                 var children = current.children;
                 int actualChildCount = 0;
+                var trs = current.identity.transform;
 
                 for (var i = 0; i < children.Count; i++)
                 {
@@ -405,15 +406,17 @@ namespace PurrNet.Modules
 
                     if (child.HasObserver(scope, allChildren))
                     {
-                        var childPair = GetRuntimePair(current.identity.transform, child.identity);
+                        var childPair = GetRuntimePair(trs, child.identity);
                         queue.Enqueue(childPair);
-
                         ++actualChildCount;
                     }
                 }
 
                 var pid = new PrefabPieceID(current.identity.prefabId, current.identity.componentIndex);
+                trs.GetLocalPositionAndRotation(out var localPos, out var localRot);
+                var localTrs = new LocalTransform(localPos, localRot, trs.localScale);
                 var piece = new GameObjectFrameworkPiece(
+                    localTrs,
                     pid,
                     current.identity.id ?? default,
                     actualChildCount,
@@ -456,16 +459,21 @@ namespace PurrNet.Modules
             {
                 using var current = queue.Dequeue();
                 var children = current.children;
+                var trs = current.identity.transform;
 
                 for (var i = 0; i < children.Count; i++)
                 {
                     var child = children[i];
-                    var childPair = GetRuntimePair(current.identity.transform, child.identity);
+                    var childPair = GetRuntimePair(trs, child.identity);
                     queue.Enqueue(childPair);
                 }
 
                 var pid = new PrefabPieceID(current.identity.prefabId, current.identity.componentIndex);
+                trs.GetLocalPositionAndRotation(out var localPos, out var localRot);
+                var localTrs = new LocalTransform(localPos, localRot, trs.localScale);
+
                 var piece = new GameObjectFrameworkPiece(
+                    localTrs,
                     pid,
                     current.identity.id ?? default,
                     children.Count,
@@ -572,6 +580,8 @@ namespace PurrNet.Modules
 
             for (int i = 0; i < currentIdx; ++i)
                 childScopeStart += framework[i].childCount;
+
+            current.localTransform.Apply(trs);
 
             // Process each child in sequence - children start after all siblings
             for (var j = 0; j < childCount; j++)

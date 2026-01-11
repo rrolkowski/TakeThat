@@ -21,7 +21,7 @@ TextureImporter:
     heightScale: 0.25
     normalMapFilter: 0
     flipGreenChannel: 0
-  isReadable: 0
+  isReadable: 1
   streamingMipmaps: 0
   streamingMipmapsPriority: 0
   vTOnly: 0
@@ -132,6 +132,6 @@ AssetOrigin:
   serializedVersion: 1
   productId: 297320
   packageName: 'PurrNet: Multiplayer Networking'
-  packageVersion: v1.15.0
+  packageVersion: v1.18.1-beta.3
   assetPath: Assets/PurrNet/Editor/Resources/purrlogo.png
-  uploadId: 782191
+  uploadId: 837734

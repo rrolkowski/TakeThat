@@ -10,6 +10,7 @@ namespace PurrNet.Editor
         private SerializedProperty _scriptProp;
         private SerializedProperty _placementProp;
         private SerializedProperty _displayTypeProp;
+        private SerializedProperty _displayTargetProp;
         private SerializedProperty _fontSizeProp;
         private SerializedProperty _textColorProp;
         private bool _displaySettingsFoldout = true;
@@ -19,6 +20,7 @@ namespace PurrNet.Editor
             _scriptProp = serializedObject.FindProperty("m_Script");
             _placementProp = serializedObject.FindProperty("placement");
             _displayTypeProp = serializedObject.FindProperty("_displayType");
+            _displayTargetProp = serializedObject.FindProperty("_displayTarget");
             _fontSizeProp = serializedObject.FindProperty("fontSize");
             _textColorProp = serializedObject.FindProperty("textColor");
         }
@@ -50,6 +52,9 @@ namespace PurrNet.Editor
                 _displayTypeProp.intValue =
                     (int)(StatisticsManager.StatisticsDisplayType)EditorGUILayout.EnumFlagsField("Display Type",
                         (StatisticsManager.StatisticsDisplayType)_displayTypeProp.intValue);
+                _displayTargetProp.intValue =
+                    (int)(StatisticsManager.StatisticsDisplayTarget)EditorGUILayout.EnumFlagsField("Display Target",
+                        (StatisticsManager.StatisticsDisplayTarget)_displayTargetProp.intValue);
 
                 float newFontSize = EditorGUILayout.Slider("Font Size", _fontSizeProp.floatValue, 8f, 32f);
                 if (Math.Abs(newFontSize - _fontSizeProp.floatValue) > 0.01f)

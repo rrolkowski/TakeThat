@@ -13,7 +13,6 @@ namespace PurrNet.Packing
         {
             Packer<T?>.RegisterWriter(PackNullables.WriteNullable);
             Packer<T?>.RegisterReader(PackNullables.ReadNullable);
-
             DeltaPacker<T?>.RegisterWriter(PackNullables.WriteDeltaNullable);
             DeltaPacker<T?>.RegisterReader(PackNullables.ReadDeltaNullable);
         }
@@ -23,6 +22,8 @@ namespace PurrNet.Packing
         {
             Packer<Dictionary<TKey, TValue>>.RegisterWriter(WriteDictionary);
             Packer<Dictionary<TKey, TValue>>.RegisterReader(ReadDictionary);
+            RegisterDisposableList<TKey>();
+            RegisterDisposableList<TValue>();
         }
 
         [UsedByIL]
@@ -32,6 +33,8 @@ namespace PurrNet.Packing
             Packer<DisposableDictionary<TKey, TValue>>.RegisterReader(PackDisposableDictionary.ReadDictionary);
             DeltaPacker<DisposableDictionary<TKey, TValue>>.RegisterWriter(PackDisposableDictionary.WriteDeltaDictionary);
             DeltaPacker<DisposableDictionary<TKey, TValue>>.RegisterReader(PackDisposableDictionary.ReadDeltaDictionary);
+            RegisterDisposableList<TKey>();
+            RegisterDisposableList<TValue>();
         }
 
         [UsedByIL]
@@ -49,12 +52,24 @@ namespace PurrNet.Packing
         }
 
         [UsedByIL]
+        public static void RegisterDisposableArray<T>()
+        {
+            Packer<DisposableArray<T>>.RegisterWriter(WriteDArray);
+            Packer<DisposableArray<T>>.RegisterReader(ReadDArray);
+            DeltaPacker<DisposableArray<T>>.RegisterWriter(PackDisposableArrays.WriteDisposableArrayDelta);
+            DeltaPacker<DisposableArray<T>>.RegisterReader(PackDisposableArrays.ReadDisposablArrayDelta);
+
+            RegisterDisposableList<T>();
+        }
+
+        [UsedByIL]
         public static void RegisterDisposableList<T>()
         {
             Packer<DisposableList<T>>.RegisterWriter(PackDisposableLists.WriteDisposableList);
             Packer<DisposableList<T>>.RegisterReader(PackDisposableLists.ReadDisposableList);
-            DeltaPacker<DisposableList<T>>.RegisterWriter(PackDisposableLists.WriteDisposableDeltaList);
-            DeltaPacker<DisposableList<T>>.RegisterReader(PackDisposableLists.ReadDisposableDeltaList);
+            DeltaPacker<DisposableList<T>>.RegisterWriter(MyersPackDisposableLists.WriteDisposableDeltaList);
+            DeltaPacker<DisposableList<T>>.RegisterReader(MyersPackDisposableLists.ReadDisposableDeltaList);
+            DiffOpSerializer.Register<T>();
         }
 
         [UsedByIL]
@@ -62,6 +77,71 @@ namespace PurrNet.Packing
         {
             Packer<DisposableHashSet<T>>.RegisterWriter(WriteDisposableHashSet);
             Packer<DisposableHashSet<T>>.RegisterReader(ReadDisposableHashSet);
+            DeltaPacker<DisposableHashSet<T>>.RegisterWriter(PackDisposableHashsets.WriteDisposableHashSetDelta);
+            DeltaPacker<DisposableHashSet<T>>.RegisterReader(PackDisposableHashsets.ReadDisposableHashSetDelta);
+            RegisterDisposableList<T>();
+        }
+
+        [UsedByIL]
+        public static void WriteDArray<T>(this BitPacker packer, DisposableArray<T> value)
+        {
+            if (value.isDisposed)
+            {
+                Packer<bool>.Write(packer, false);
+                return;
+            }
+
+            Packer<bool>.Write(packer, true);
+            Packer<Size>.Write(packer, value.Count);
+
+            for (int i = 0; i < value.Count; i++)
+                Packer<T>.Write(packer, value[i]);
+        }
+
+        [UsedByIL]
+        public static bool WriteDeltaDArray<T>(this BitPacker packer, DisposableArray<T> value, DisposableArray<T> newValue)
+        {
+            using var old = value.isDisposed ? default : DisposableList<T>.Create(value);
+            using var @new = newValue.isDisposed ? default : DisposableList<T>.Create(newValue);
+
+            return DeltaPacker<DisposableList<T>>.Write(packer, old, @new);
+        }
+
+        [UsedByIL]
+        public static void ReadDeltaDArray<T>(this BitPacker packer, ref DisposableArray<T> value,
+            ref DisposableArray<T> newValue)
+        {
+            using var old = value.isDisposed ? default : DisposableList<T>.Create(value);
+            var @new = newValue.isDisposed ? default : DisposableList<T>.Create(newValue);
+
+            DeltaPacker<DisposableList<T>>.Read(packer, old, ref @new);
+
+            value.Dispose();
+
+            if (!@new.isDisposed)
+                value = DisposableArray<T>.Create(@new);
+
+            @new.Dispose();
+        }
+
+        [UsedByIL]
+        public static void ReadDArray<T>(this BitPacker packer, ref DisposableArray<T> value)
+        {
+            bool hasValue = Packer<bool>.Read(packer);
+            value.Dispose();
+
+            if (!hasValue)
+                return;
+
+            int length = Packer<Size>.Read(packer);
+            value = DisposableArray<T>.Create(length);
+
+            for (int i = 0; i < length; i++)
+            {
+                T item = default;
+                Packer<T>.Read(packer, ref item);
+                value[i] = item;
+            }
         }
 
         [UsedByIL]
@@ -96,7 +176,7 @@ namespace PurrNet.Packing
             long length = default;
 
             packer.ReadInteger(ref length, 31);
-            value = new DisposableHashSet<T>((int)length);
+            value = DisposableHashSet<T>.Create((int)length);
 
             for (int i = 0; i < length; i++)
             {
@@ -297,6 +377,7 @@ namespace PurrNet.Packing
 
             if (!areEqual)
                 ReadArray(packer, ref value);
+            else value = Packer.Copy(oldvalue);
         }
 
         private static void ReadDeltaList<T>(BitPacker packer, List<T> oldvalue, ref List<T> value)
@@ -306,6 +387,7 @@ namespace PurrNet.Packing
 
             if (!areEqual)
                 ReadList(packer, ref value);
+            else value = Packer.Copy(oldvalue);
         }
 
         [UsedByIL]

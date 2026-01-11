@@ -22,10 +22,6 @@ namespace PurrNet.Codegen
                 var module = type.Module;
 
                 string objectClassFullName = typeof(UnityEngine.Object).FullName;
-                var unityProxyType = module.GetTypeReference(typeof(UnityProxy)).Import(module).Resolve();
-
-                if (unityProxyType == null)
-                    return;
 
                 foreach (var method in type.Methods)
                 {
@@ -46,12 +42,17 @@ namespace PurrNet.Codegen
                         if (methodReference.DeclaringType.FullName != objectClassFullName)
                             continue;
 
-                        if (methodReference.Name != "Instantiate" && methodReference.Name != "Destroy")
+                        if (methodReference.Name != "Instantiate" && methodReference.Name != "Destroy" && methodReference.Name != "DontDestroyOnLoad")
                             continue;
 
                         var resolved = methodReference.Resolve();
 
                         if (resolved == null)
+                            continue;
+
+                        var unityProxyType = module.GetTypeReference(typeof(UnityProxy)).Import(module).Resolve();
+
+                        if (unityProxyType == null)
                             continue;
 
                         var targetMethod = GetInstantiateDefinition(resolved, unityProxyType);

@@ -17,7 +17,7 @@ namespace PurrNet.Packing
             Packer<bool>.Write(packer, true);
 
             uint length = (uint)value.Count;
-            Packer<PackedUInt>.Write(packer, length);
+            Packer<Size>.Write(packer, length);
 
             for (int i = 0; i < length; i++)
                 Packer<T>.Write(packer, value[i]);
@@ -35,9 +35,9 @@ namespace PurrNet.Packing
             if (!hasValue)
                 return;
 
-            PackedUInt length = default;
-            Packer<PackedUInt>.Read(packer, ref length);
-            value = DisposableList<T>.Create((int)length.value);
+            Size length = default;
+            Packer<Size>.Read(packer, ref length);
+            value = DisposableList<T>.Create(length);
 
             for (int i = 0; i < length; i++)
             {

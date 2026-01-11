@@ -15,12 +15,6 @@ namespace PurrNet.Editor
     {
         public int callbackOrder => 0;
 
-        [MenuItem("Tools/PurrNet/Debug/Hasher/Simulate Post Build")]
-        static void SimulatePostBuild()
-        {
-            Cleanup();
-        }
-
         public void OnPostprocessBuild(BuildReport report)
         {
             Cleanup();
@@ -60,20 +54,6 @@ namespace PurrNet.Editor
             }
 
             AssetDatabase.Refresh();
-        }
-
-        [MenuItem("Tools/PurrNet/Debug/Hasher/Simulate Build")]
-        static void SimulateBuild()
-        {
-            Hasher.ClearState();
-            NetworkManager.CallAllRegisters();
-        }
-
-        [MenuItem("Tools/PurrNet/Debug/Hasher/Print Hashes")]
-        static void PrintHashes()
-        {
-            var hashes = Hasher.GetAllHashesAsText();
-            Debug.Log(hashes);
         }
 
         static string TryFindVersion()

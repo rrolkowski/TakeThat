@@ -11,8 +11,8 @@ namespace PurrNet.Packing
 
         public CompressedVector2(CompressedFloat x, CompressedFloat y)
         {
-            this.x = x.Round();
-            this.y = y.Round();
+            this.x = x;
+            this.y = y;
         }
 
         public override string ToString()
@@ -39,5 +39,3 @@ namespace PurrNet.Packing
         }
     }
 }
-
-

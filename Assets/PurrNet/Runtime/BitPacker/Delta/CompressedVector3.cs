@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace PurrNet.Packing
 {
-    [System.Serializable]
+    [Serializable]
     public struct CompressedVector3 : IEquatable<CompressedVector3>
     {
         public CompressedFloat x;
@@ -12,9 +12,9 @@ namespace PurrNet.Packing
 
         public CompressedVector3(CompressedFloat x, CompressedFloat y, CompressedFloat z)
         {
-            this.x = x.Round();
-            this.y = y.Round();
-            this.z = z.Round();
+            this.x = x;
+            this.y = y;
+            this.z = z;
         }
 
         public override string ToString()

@@ -12,6 +12,14 @@ using UnityEngine.Scripting;
 namespace PurrNet
 {
     [AttributeUsage(AttributeTargets.Method), UsedImplicitly]
+    public class PurrContextButtonAttribute
+#if PURR_CONTEXT_BUTTONS
+        : PurrButtonAttribute { }
+#else
+        : Attribute {}
+#endif
+
+    [AttributeUsage(AttributeTargets.Method), UsedImplicitly]
     public class PurrButtonAttribute : PreserveAttribute
     {
         public string ButtonName { get; private set; }
@@ -45,7 +53,7 @@ namespace PurrNet
             {
                 var attr = method.GetCustomAttribute<PurrButtonAttribute>();
                 if (attr == null) continue;
-    
+
                 var buttonName = !string.IsNullOrEmpty(attr.ButtonName) ? attr.ButtonName : ObjectNames.NicifyVariableName(method.Name);
 
                 if (GUILayout.Button(buttonName))

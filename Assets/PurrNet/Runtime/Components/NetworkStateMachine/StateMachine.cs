@@ -93,9 +93,12 @@ namespace PurrNet.StateMachine
             }
         }
 
-        protected override void OnSpawned()
+        protected override void OnSpawned(bool asServer)
         {
             base.OnSpawned();
+
+            if (asServer && networkManager.isPlannedHost)
+                return;
             
             if (!IsController(_ownerAuth))
                 return;

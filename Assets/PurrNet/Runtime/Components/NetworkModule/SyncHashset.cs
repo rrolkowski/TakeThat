@@ -281,7 +281,22 @@ namespace PurrNet
 
         private void InvokeChange(SyncHashSetChange<T> change)
         {
-            onChanged?.Invoke(change);
+            try
+            {
+                onChanged?.Invoke(change);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+        }
+
+        public override void OnPoolReset()
+        {
+            onChanged = null;
+#if UNITY_EDITOR
+            onChanged += UpdateSerializedSet;
+#endif
         }
 
         #region RPCs

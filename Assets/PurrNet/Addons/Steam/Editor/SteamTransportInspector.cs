@@ -47,9 +47,12 @@ namespace PurrNet.Steam.Editor
                     MessageType.Warning);
                 if (GUILayout.Button("Add SteamWorks.NET to Package Manager"))
                 {
-                    Client.Add(
-                        "https://github.com/rlabrecque/Steamworks.NET.git?path=/com.rlabrecque.steamworks.net#2024.8.0");
-                    Client.Resolve();
+                    if (GitHelper.CheckGit())
+                    {
+                        Client.Add(
+                            "https://github.com/rlabrecque/Steamworks.NET.git?path=/com.rlabrecque.steamworks.net#2024.8.0");
+                        Client.Resolve();
+                    }
                 }
 #endif
                 GUI.enabled = true;

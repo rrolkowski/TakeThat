@@ -1,15 +1,18 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Runtime.CompilerServices;
+using PurrNet.Packing;
 
 namespace PurrNet.Pooling
 {
-    public struct DisposableHashSet<T> : ISet<T>, IDisposable
+    public struct DisposableHashSet<T> : ISet<T>, IDisposable, IDuplicate<DisposableHashSet<T>>
     {
         private HashSet<T> _set;
 
         public HashSet<T> set => _set;
 
+        [Obsolete( "Use DisposableHashSet<T>.Create() instead")]
         public DisposableHashSet(int capacity)
         {
             var newSet = HashSetPool<T>.Instantiate();
@@ -20,11 +23,29 @@ namespace PurrNet.Pooling
             _set = newSet;
             isDisposed = false;
         }
-        
+
         public static DisposableHashSet<T> Create()
         {
             var val = new DisposableHashSet<T>();
             val._set = HashSetPool<T>.Instantiate();
+            val.isDisposed = false;
+            return val;
+        }
+
+        public static DisposableHashSet<T> Create(int capacity)
+        {
+            var val = new DisposableHashSet<T>();
+            val._set = HashSetPool<T>.Instantiate();
+            val._set.EnsureCapacity(capacity);
+            val.isDisposed = false;
+            return val;
+        }
+
+        public static DisposableHashSet<T> Create(IEnumerable<T> copyFrom)
+        {
+            var val = new DisposableHashSet<T>();
+            val._set = HashSetPool<T>.Instantiate();
+            val._set.UnionWith(copyFrom);
             val.isDisposed = false;
             return val;
         }
@@ -158,5 +179,20 @@ namespace PurrNet.Pooling
 
         public bool IsReadOnly => false;
         public bool isDisposed { get; private set; }
+
+        public DisposableHashSet<T> Duplicate()
+        {
+            if (isDisposed)
+                return default;
+
+            if (RuntimeHelpers.IsReferenceOrContainsReferences<T>())
+            {
+                var res = Create();
+                foreach (var value in this)
+                    res.Add(Packer.Copy(value));
+                return res;
+            }
+            return Create(this);
+        }
     }
 }

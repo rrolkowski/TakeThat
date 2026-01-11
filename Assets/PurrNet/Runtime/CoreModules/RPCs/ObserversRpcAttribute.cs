@@ -14,7 +14,8 @@ namespace PurrNet
             bool excludeOwner = false,
             bool excludeSender = false,
             CompressionLevel compressionLevel = CompressionLevel.None,
-            float asyncTimeoutInSec = 5f)
+            float asyncTimeoutInSec = 5f,
+            bool deltaPacked = false)
         {
         }
     }

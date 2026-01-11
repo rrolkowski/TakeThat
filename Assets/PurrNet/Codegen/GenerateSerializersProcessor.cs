@@ -22,6 +22,7 @@ namespace PurrNet.Codegen
         Queue,
         Stack,
         DisposableList,
+        DisposableArray,
         DisposableHashSet,
         DisposableDictionary
     }
@@ -31,10 +32,10 @@ namespace PurrNet.Codegen
         public static bool ValideType(TypeReference type)
         {
             // Check if the type itself is an interface
-            if (type.Resolve()?.IsInterface == true)
+            /*if (type.Resolve()?.IsInterface == true)
             {
                 return false;
-            }
+            }*/
 
             bool isDelegate = PostProcessor.InheritsFrom(type.Resolve(), typeof(Delegate).FullName);
 
@@ -50,7 +51,7 @@ namespace PurrNet.Codegen
                 // Recursively validate all generic arguments
                 foreach (var argument in genericInstance.GenericArguments)
                 {
-                    if (argument.ContainsGenericParameter || argument.Resolve()?.IsInterface == true ||
+                    if (argument.ContainsGenericParameter ||/* argument.Resolve()?.IsInterface == true ||*/
                         !ValideType(argument))
                     {
                         return false;
@@ -107,6 +108,10 @@ namespace PurrNet.Codegen
                 assembly.MainModule.TypeSystem.Object
             );
 
+            var editorType = assembly.MainModule.GetTypeDefinition<GeneratedByILAttribute>().Import(assembly.MainModule);
+            var editorConstructor = editorType.Resolve().Methods.First(m => m.IsConstructor && !m.HasParameters).Import(assembly.MainModule);
+            var editorAttribute = new CustomAttribute(editorConstructor);
+            serializerClass.CustomAttributes.Add(editorAttribute);
             var resolvedType = type.Resolve();
 
             if (resolvedType == null)
@@ -117,14 +122,10 @@ namespace PurrNet.Codegen
             if (hasDontPack)
                 return;
 
-            if (resolvedType.IsInterface)
-                return;
-
             var bitStreamType = assembly.MainModule.GetTypeDefinition(typeof(BitPacker)).Import(assembly.MainModule);
             var mainmodule = assembly.MainModule;
 
-
-            if (hashOnly)
+            if (resolvedType.IsInterface || hashOnly)
             {
                 assembly.MainModule.Types.Add(serializerClass);
                 HandleHashOnly(assembly, type, serializerClass);
@@ -212,7 +213,7 @@ namespace PurrNet.Codegen
             if (ignoreDelta?.Contains(type) == false)
                 GenerateDeltaSerializersProcessor.HandleType(assembly, type, serializerClass);
 
-            RegisterSerializersProcessor.HandleType(type.Module, serializerClass, isEditor, null, null);
+            RegisterSerializersProcessor.HandleType(type.Module, serializerClass, null, null);
         }
 
         private static void HandleHashOnly(AssemblyDefinition assembly, TypeReference type,
@@ -223,9 +224,10 @@ namespace PurrNet.Codegen
 
             var editorType = assembly.MainModule.GetTypeDefinition<RegisterPackersAttribute>()
                 .Import(assembly.MainModule);
-            var editorConstructor = editorType.Resolve().Methods.First(m => m.IsConstructor && !m.HasParameters)
+            var editorConstructor = editorType.Resolve().Methods.First(m => m.IsConstructor && m.HasParameters)
                 .Import(assembly.MainModule);
             var editorAttribute = new CustomAttribute(editorConstructor);
+            editorAttribute.ConstructorArguments.Add(new CustomAttributeArgument(assembly.MainModule.TypeSystem.Int32, -1));
             registerMethod.CustomAttributes.Add(editorAttribute);
 
             var il = registerMethod.Body.GetILProcessor();
@@ -249,9 +251,10 @@ namespace PurrNet.Codegen
                 new MethodDefinition("Register", MethodAttributes.Static, assembly.MainModule.TypeSystem.Void);
 
             var editorType = assembly.MainModule.GetTypeDefinition<RegisterPackersAttribute>();
-            var editorConstructor = editorType.Resolve().Methods.First(m => m.IsConstructor && !m.HasParameters)
+            var editorConstructor = editorType.Resolve().Methods.First(m => m.IsConstructor && m.HasParameters)
                 .Import(assembly.MainModule);
             var editorAttribute = new CustomAttribute(editorConstructor);
+            editorAttribute.ConstructorArguments.Add(new CustomAttributeArgument(assembly.MainModule.TypeSystem.Int32, -1));
             registerMethod.CustomAttributes.Add(editorAttribute);
 
             registerMethod.Body = new MethodBody(registerMethod)
@@ -271,10 +274,10 @@ namespace PurrNet.Codegen
                 new MethodDefinition("Register", MethodAttributes.Static, assembly.MainModule.TypeSystem.Void);
 
             var editorType = assembly.MainModule.GetTypeDefinition<RegisterPackersAttribute>();
-            var editorConstructor = editorType.Resolve().Methods.First(m => m.IsConstructor && !m.HasParameters)
+            var editorConstructor = editorType.Resolve().Methods.First(m => m.IsConstructor && m.HasParameters)
                 .Import(assembly.MainModule);
             var editorAttribute = new CustomAttribute(editorConstructor);
-
+            editorAttribute.ConstructorArguments.Add(new CustomAttributeArgument(assembly.MainModule.TypeSystem.Int32, -1));
             registerMethod.CustomAttributes.Add(editorAttribute);
             registerMethod.Body = new MethodBody(registerMethod)
             {
@@ -294,9 +297,10 @@ namespace PurrNet.Codegen
                 new MethodDefinition("Register", MethodAttributes.Static, assembly.MainModule.TypeSystem.Void);
 
             var editorType = assembly.MainModule.GetTypeDefinition<RegisterPackersAttribute>();
-            var editorConstructor = editorType.Resolve().Methods.First(m => m.IsConstructor && !m.HasParameters)
+            var editorConstructor = editorType.Resolve().Methods.First(m => m.IsConstructor && m.HasParameters)
                 .Import(assembly.MainModule);
             var editorAttribute = new CustomAttribute(editorConstructor);
+            editorAttribute.ConstructorArguments.Add(new CustomAttributeArgument(assembly.MainModule.TypeSystem.Int32, -1));
             registerMethod.CustomAttributes.Add(editorAttribute);
             registerMethod.Body = new MethodBody(registerMethod)
             {
@@ -390,6 +394,13 @@ namespace PurrNet.Codegen
 
                     il.Emit(OpCodes.Call, genericRegisterDListMethod);
                     break;
+                case HandledGenericTypes.DisposableArray when importedType is GenericInstanceType stackType:
+                    var registerDisposableArrayMethod =
+                        packCollectionsType.GetMethod("RegisterDisposableArray", true).Import(module);
+                    var genericRegisterDArrayMethod = new GenericInstanceMethod(registerDisposableArrayMethod);
+                    genericRegisterDArrayMethod.GenericArguments.Add(stackType.GenericArguments[0]);
+                    il.Emit(OpCodes.Call, genericRegisterDArrayMethod);
+                    break;
                 case HandledGenericTypes.DisposableHashSet when importedType is GenericInstanceType stackType:
                     var registerDisposableHashSetMethod =
                         packCollectionsType.GetMethod("RegisterDisposableHashSet", true).Import(module);
@@ -452,6 +463,19 @@ namespace PurrNet.Codegen
             return baseType != null && HasInterface(baseType, interfaceType);
         }
 
+        public static TypeDefinition HasInterfaceExtra(TypeDefinition def, Type interfaceType)
+        {
+            bool selfHas = def.Interfaces.Any(i => i.InterfaceType.FullName == interfaceType.FullName);
+            if (selfHas)
+                return def;
+
+            var baseType = def.BaseType?.Resolve();
+            if (baseType != null)
+                return HasInterfaceExtra(baseType, interfaceType);
+
+            return null;
+        }
+
         public static bool HasInterface(TypeDefinition def, Type interfaceType)
         {
             bool selfHas = def.Interfaces.Any(i => i.InterfaceType.FullName == interfaceType.FullName);
@@ -465,14 +489,13 @@ namespace PurrNet.Codegen
             return baseType != null && HasInterface(baseType, interfaceType);
         }
 
-        private static MethodReference CreateSetterMethod(TypeDefinition parent, FieldDefinition field)
+        private static void CreateSetterMethod(TypeDefinition parent, FieldDefinition field)
         {
             var name = MakeFullNameValidCSharp($"Purrnet_Set_{field.Name}");
 
             foreach (var m in parent.Methods)
             {
-                if (m.Name == name)
-                    return m;
+                if (m.Name == name) return;
             }
 
             var method = new MethodDefinition(name, MethodAttributes.Public, parent.Module.TypeSystem.Void);
@@ -510,17 +533,15 @@ namespace PurrNet.Codegen
             setter.Emit(OpCodes.Ret);
 
             parent.Methods.Add(method);
-            return method;
         }
 
-        private static MethodReference CreateGetterMethod(TypeDefinition parent, FieldDefinition field)
+        private static void CreateGetterMethod(TypeDefinition parent, FieldDefinition field)
         {
             var name = MakeFullNameValidCSharp($"Purrnet_Get_{field.Name}");
 
             foreach (var m in parent.Methods)
             {
-                if (m.Name == name)
-                    return m;
+                if (m.Name == name) return;
             }
 
             var method = new MethodDefinition(MakeFullNameValidCSharp($"Purrnet_Get_{field.Name}"),
@@ -554,7 +575,6 @@ namespace PurrNet.Codegen
             getter.Emit(OpCodes.Ret); // Return the field value
 
             parent.Methods.Add(method);
-            return method;
         }
 
         public static bool DoesTypeHaveAttribute(TypeDefinition type, Type attribute)
@@ -598,6 +618,16 @@ namespace PurrNet.Codegen
 
             var ret = il.Create(OpCodes.Ret);
 
+            var standaloneType = HasInterfaceExtra(type, typeof(IStandaloneSerializable));
+
+            if (standaloneType != null && standaloneType.FullName != type.FullName)
+            {
+                // call Packer<>.Write for the standalone type
+                CallForStandalone(isWriting, method, serializeDirect, il, mainmodule, packerType, standaloneType, type);
+                il.Append(ret);
+                return;
+            }
+
             if (isClass)
             {
                 // write null check
@@ -623,6 +653,8 @@ namespace PurrNet.Codegen
                 // if returned false, just return
                 il.Emit(OpCodes.Brfalse, ret);
             }
+
+            CreateGettersAndSetters(isWriting, type);
 
             if (type.IsEnum)
             {
@@ -708,7 +740,11 @@ namespace PurrNet.Codegen
                 {
                     if (isWriting)
                     {
-                        var getter = CreateGetterMethod(type, field);
+                        var getterName = MakeFullNameValidCSharp($"Purrnet_Get_{field.Name}");
+                        var getter = new MethodReference(getterName, fieldType, typeRef)
+                        {
+                            HasThis = true
+                        };
 
                         if (typeRef is GenericInstanceType genericInstanceType)
                         {
@@ -742,7 +778,14 @@ namespace PurrNet.Codegen
                         var variable = new VariableDefinition(fieldType);
                         method.Body.Variables.Add(variable);
 
-                        var setter = CreateSetterMethod(type, field);
+                        var setterName = MakeFullNameValidCSharp($"Purrnet_Set_{field.Name}");
+                        var setter = new MethodReference(setterName, type.Module.TypeSystem.Void, typeRef)
+                        {
+                            HasThis = true
+                        };
+
+                        setter.Parameters.Add(
+                            new ParameterDefinition("value", ParameterAttributes.None, fieldType));
 
                         if (typeRef is GenericInstanceType genericInstanceType)
                         {
@@ -791,6 +834,70 @@ namespace PurrNet.Codegen
             il.Emit(OpCodes.Call, readData);*/
 
             il.Append(ret);
+        }
+
+        public static void CreateGettersAndSetters(bool isWriting, TypeDefinition type)
+        {
+            for (var i = 0; i < type.Fields.Count; i++)
+            {
+                var field = type.Fields[i];
+                if (field.IsStatic)
+                    continue;
+
+                bool isDelegate = PostProcessor.InheritsFrom(field.FieldType.Resolve(), typeof(Delegate).FullName);
+
+                if (isDelegate)
+                    continue;
+
+                var ignore = ShouldIgnoreField(field);
+
+                if (ignore)
+                    continue;
+
+                if (!field.IsPublic)
+                {
+                    if (isWriting)
+                        CreateGetterMethod(type, field);
+                    else CreateSetterMethod(type, field);
+                }
+            }
+        }
+
+        private static void CallForStandalone(bool isWriting, MethodDefinition method, MethodReference serializeDirect,
+            ILProcessor il, ModuleDefinition mainmodule, TypeReference packerType, TypeDefinition standaloneType,
+            TypeDefinition type)
+        {
+            var genericM = CreateGenericMethod(packerType, standaloneType, serializeDirect, mainmodule);
+
+            var variable = new VariableDefinition(standaloneType);
+
+            if (isWriting)
+            {
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldarg_1);
+            }
+            else
+            {
+                // variable = this
+                method.Body.Variables.Add(variable);
+
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldind_Ref);
+                il.Emit(OpCodes.Stloc, variable);
+
+                il.Emit(OpCodes.Ldarg_0);
+                il.Emit(OpCodes.Ldloca, variable);
+            }
+
+            il.Emit(OpCodes.Call, genericM);
+
+            if (!isWriting)
+            {
+                il.Emit(OpCodes.Ldarg_1);
+                il.Emit(OpCodes.Ldloc, variable);
+                il.Emit(OpCodes.Castclass, type);
+                il.Emit(OpCodes.Stind_Ref);
+            }
         }
 
         private static bool ShouldIgnoreField(FieldDefinition field)
@@ -961,6 +1068,13 @@ namespace PurrNet.Codegen
                 type = HandledGenericTypes.DisposableList;
                 return true;
             }
+
+            if (IsGeneric(typeDef, typeof(DisposableArray<>)))
+            {
+                type = HandledGenericTypes.DisposableArray;
+                return true;
+            }
+
 
             if (IsGeneric(typeDef, typeof(DisposableHashSet<>)))
             {

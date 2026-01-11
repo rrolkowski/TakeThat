@@ -18,6 +18,13 @@ namespace PurrNet.Packing
     {
     }
 
+    /// <summary>
+    /// Marks a type as self-serializable, meaning its serializer
+    /// should not cascade into base or derived class serializers.
+    /// Only this type's serializer will be used.
+    /// </summary>
+    public interface IStandaloneSerializable {}
+
     public interface IPacked
     {
         void Write(BitPacker packer);

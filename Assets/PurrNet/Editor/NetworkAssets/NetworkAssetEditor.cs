@@ -26,7 +26,7 @@ namespace PurrNet
         [UsedImplicitly]
         private const int AssetsPerPage = 20;
         [UsedImplicitly]
-        private int _assetPage = 0;
+        private int _assetPage;
 
         private static GUIStyle DescriptionStyle()
         {

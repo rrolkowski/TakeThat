@@ -1,24 +1,14 @@
 ﻿using System;
 using PurrNet.Packing;
 using PurrNet.Transports;
+using PurrNet.Utils;
 
 namespace PurrNet
 {
-    public interface IRpc
-    {
-        public ByteData rpcData { get; set; }
-        PlayerID senderPlayerId { get; }
-        PlayerID targetPlayerId { get; set; }
-    }
-
     public struct RPCPacket : IPackedAuto, IRpc
     {
-        public NetworkID networkId;
-        public SceneID sceneId;
-        public PlayerID senderId;
-        public PlayerID? targetId;
-        public byte rpcId;
-        public ByteData data;
+        public NetworkIdentityRPCHeader header;
+        [DontDeltaCompress] public ByteData data;
 
         public ByteData rpcData
         {
@@ -26,75 +16,56 @@ namespace PurrNet
             set { data = value; }
         }
 
-        public PlayerID senderPlayerId => senderId;
+        public PlayerID senderPlayerId => header.senderId;
 
         public PlayerID targetPlayerId
         {
-            get => targetId ?? default;
-            set => targetId = value;
-        }
-    }
-
-    public struct ChildRPCPacket : IPackedAuto, IRpc
-    {
-        public NetworkID networkId;
-        public SceneID sceneId;
-        public PlayerID senderId;
-        public PlayerID? targetId;
-        public byte rpcId;
-        public byte childId;
-        public ByteData data;
-
-        public ByteData rpcData
-        {
-            get { return data; }
-            set { data = value; }
+            get => header.targetId ?? default;
+            set => header.targetId = value;
         }
 
-        public PlayerID senderPlayerId => senderId;
-
-        public PlayerID targetPlayerId
+        public uint GetStableHeaderHash()
         {
-            get => targetId ?? default;
-            set => targetId = value;
-        }
-    }
+            ulong nid = header.networkId.id.value;
+            ulong nscope = header.networkId.scope.id.value;
+            ulong sceneScope = header.sceneId.id.value;
+            ulong rpc = header.rpcId.value;
 
-    public struct StaticRPCPacket : IPackedAuto, IRpc
-    {
-        public uint typeHash;
-        public byte rpcId;
-        public PlayerID senderId;
-        public PlayerID? targetId;
-        public ByteData data;
+            ulong hash = 1469598103934665603UL;
+            const ulong prime = 1099511628211UL;
 
-        public ByteData rpcData
-        {
-            get { return data; }
-            set { data = value; }
-        }
+            hash ^= Hasher<RPCPacket>.stableHash;
+            hash *= prime;
 
-        public PlayerID senderPlayerId => senderId;
-        public PlayerID targetPlayerId
-        {
-            get => targetId ?? default;
-            set => targetId = value;
+            hash ^= nid;
+            hash *= prime;
+
+            hash ^= nscope;
+            hash *= prime;
+
+            hash ^= sceneScope;
+            hash *= prime;
+
+            hash ^= rpc;
+            hash *= prime;
+
+            return (uint)(hash ^ (hash >> 32));
         }
     }
 
     internal readonly struct RPC_ID : IEquatable<RPC_ID>
     {
-        public readonly uint typeHash;
+        public readonly PackedUInt typeHash;
         public readonly SceneID sceneId;
         public readonly NetworkID networkId;
-        private readonly byte rpcId;
-        private readonly byte childId;
+        private readonly Size rpcId;
+        private readonly Size childId;
 
         public RPC_ID(RPCPacket packet)
         {
-            sceneId = packet.sceneId;
-            networkId = packet.networkId;
-            rpcId = packet.rpcId;
+            sceneId = packet.header.sceneId;
+            networkId = packet.header.networkId;
+            rpcId = packet.header.rpcId;
             typeHash = default;
             childId = default;
         }
@@ -103,18 +74,18 @@ namespace PurrNet
         {
             sceneId = default;
             networkId = default;
-            rpcId = packet.rpcId;
-            typeHash = packet.typeHash;
+            rpcId = packet.header.rpcId;
+            typeHash = packet.header.typeHash;
             childId = default;
         }
 
         public RPC_ID(ChildRPCPacket packet)
         {
-            sceneId = packet.sceneId;
-            networkId = packet.networkId;
-            rpcId = packet.rpcId;
+            sceneId = packet.header.sceneId;
+            networkId = packet.header.networkId;
+            rpcId = packet.header.rpcId;
             typeHash = default;
-            childId = packet.childId;
+            childId = packet.header.childId;
         }
 
         public override int GetHashCode()

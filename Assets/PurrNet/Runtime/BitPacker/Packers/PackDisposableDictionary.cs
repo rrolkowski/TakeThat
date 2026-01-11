@@ -89,15 +89,24 @@ namespace PurrNet.Packing
                 {
                     oldKeysList = DisposableList<TKey>.Create(oldCount.value);
                     oldValuesList = DisposableList<TValue>.Create(oldCount.value);
-                    oldKeysList.AddRange(old.Keys);
-                    oldValuesList.AddRange(old.Values);
+
+                    foreach (var (key, val) in old)
+                    {
+                        oldKeysList.Add(key);
+                        oldValuesList.Add(val);
+                    }
                 }
 
-                newKeysList.AddRange(value.Keys);
-                newValuesList.AddRange(value.Values);
+                foreach (var (key, val) in value)
+                {
+                    newKeysList.Add(key);
+                    newValuesList.Add(val);
+                }
 
-                hasChanged = packer.WriteDisposableDeltaList(oldKeysList, newKeysList) || hasChanged;
-                hasChanged = packer.WriteDisposableDeltaList(oldValuesList, newValuesList) || hasChanged;
+                hasChanged = DeltaPacker<DisposableList<TKey>>.Write(packer, oldKeysList, newKeysList) || hasChanged;
+                //hasChanged = packer.WriteDisposableDeltaList(oldKeysList, newKeysList) || hasChanged;
+                hasChanged = DeltaPacker<DisposableList<TValue>>.Write(packer, oldValuesList, newValuesList) || hasChanged;
+                //hasChanged = packer.WriteDisposableDeltaList(oldValuesList, newValuesList) || hasChanged;
 
                 oldKeysList.Dispose();
                 oldValuesList.Dispose();
@@ -163,15 +172,21 @@ namespace PurrNet.Packing
             {
                 oldKeysList = DisposableList<TKey>.Create(oldCount.value);
                 oldValuesList = DisposableList<TValue>.Create(oldCount.value);
-                oldKeysList.AddRange(oldvalue.Keys);
-                oldValuesList.AddRange(oldvalue.Values);
+
+                foreach (var (key, val) in oldvalue)
+                {
+                    oldKeysList.Add(key);
+                    oldValuesList.Add(val);
+                }
             }
 
             var keysList = DisposableList<TKey>.Create(newCount.value);
             var valuesList = DisposableList<TValue>.Create(newCount.value);
 
-            packer.ReadDisposableDeltaList(oldKeysList, ref keysList);
-            packer.ReadDisposableDeltaList(oldValuesList, ref valuesList);
+            DeltaPacker<DisposableList<TKey>>.Read(packer, oldKeysList, ref keysList);
+            //packer.ReadDisposableDeltaList(oldKeysList, ref keysList);
+            DeltaPacker<DisposableList<TValue>>.Read(packer, oldValuesList, ref valuesList);
+            //packer.ReadDisposableDeltaList(oldValuesList, ref valuesList);
 
             for (int i = 0; i < newCount.value; i++)
                 value.Add(keysList[i], valuesList[i]);

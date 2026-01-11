@@ -19,7 +19,7 @@ namespace PurrNet.Packing
         [UsedByIL]
         private static bool WriteAngle(BitPacker packer, NormalizedFloat oldvalue, NormalizedFloat newvalue)
         {
-            PackedLong delta = newvalue.value - oldvalue.value;
+            var delta = newvalue.value - oldvalue.value;
 
             if (delta == 0)
             {
@@ -28,7 +28,8 @@ namespace PurrNet.Packing
             }
 
             Packer<bool>.Write(packer, true);
-            Packer<PackedLong>.Write(packer, delta);
+            //Packer<PackedLong>.Write(packer, delta);
+            PackingIntegers.WritePrefixed(packer, delta, NormalizedFloat.BIT_RESOLUTION);
             return true;
         }
 
@@ -44,9 +45,11 @@ namespace PurrNet.Packing
                 return;
             }
 
-            PackedLong delta = default;
-            Packer<PackedLong>.Read(packer, ref delta);
-            value.value = oldvalue.value + delta.value;
+            /*PackedLong delta = default;
+            Packer<PackedLong>.Read(packer, ref delta);*/
+            long delta = default;
+            PackingIntegers.ReadPrefixed(packer, ref delta, NormalizedFloat.BIT_RESOLUTION);
+            value.value = oldvalue.value + delta;
         }
     }
 }

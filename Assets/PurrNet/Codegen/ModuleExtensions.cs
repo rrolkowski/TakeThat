@@ -1,7 +1,6 @@
 #if UNITY_MONO_CECIL
 
 using System;
-using JetBrains.Annotations;
 using Mono.Cecil;
 
 namespace PurrNet.Codegen
@@ -145,6 +144,71 @@ namespace PurrNet.Codegen
             {
                 if (type.Methods[i].Name == name && type.Methods[i].HasGenericParameters == isGeneric)
                     return type.Methods[i];
+            }
+
+            throw new Exception($"Method {name} not found on type {type.FullName}");
+        }
+
+        public static MethodReference GetMethodRef(this TypeReference typeRef, string name, bool isGeneric = false)
+        {
+            var resolved = typeRef.Resolve();
+            if (resolved == null)
+                throw new InvalidOperationException("Unable to resolve type: " + typeRef.FullName);
+
+            MethodDefinition methodDef = null;
+            for (int i = 0; i < resolved.Methods.Count; i++)
+            {
+                var m = resolved.Methods[i];
+                if (m.Name == name && m.HasGenericParameters == isGeneric)
+                {
+                    methodDef = m;
+                    break;
+                }
+            }
+
+            if (methodDef == null)
+                throw new Exception("Method " + name + " not found on type " + resolved.FullName);
+
+            var imported = typeRef.Module.ImportReference(methodDef);
+
+            if (typeRef is GenericInstanceType git)
+            {
+                var genericMethod = new MethodReference(imported.Name, imported.ReturnType, git)
+                {
+                    HasThis = imported.HasThis,
+                    ExplicitThis = imported.ExplicitThis,
+                    CallingConvention = imported.CallingConvention
+                };
+
+                for (int i = 0; i < imported.Parameters.Count; i++)
+                {
+                    var p = imported.Parameters[i];
+                    genericMethod.Parameters.Add(new ParameterDefinition(p.ParameterType));
+                }
+
+                for (int i = 0; i < imported.GenericParameters.Count; i++)
+                {
+                    var gp = imported.GenericParameters[i];
+                    genericMethod.GenericParameters.Add(new GenericParameter(gp.Name, genericMethod));
+                }
+
+                return genericMethod;
+            }
+
+            return imported;
+        }
+
+        public static MethodDefinition GetMethod(this TypeDefinition type, string name, int paramCount, bool isGeneric = false)
+        {
+            for (var i = 0; i < type.Methods.Count; i++)
+            {
+                if (type.Methods[i].Name == name && type.Methods[i].HasGenericParameters == isGeneric)
+                {
+                    var method = type.Methods[i];
+
+                    if (method.Parameters.Count == paramCount)
+                        return method;
+                }
             }
 
             throw new Exception($"Method {name} not found on type {type.FullName}");

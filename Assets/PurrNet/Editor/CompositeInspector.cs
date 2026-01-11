@@ -18,6 +18,10 @@ namespace PurrNet.Editor
 
         public override void OnInspectorGUI()
         {
+            base.OnInspectorGUI();
+
+            EditorGUILayout.Space();
+
             serializedObject.Update();
 
             var composite = (CompositeTransport)target;

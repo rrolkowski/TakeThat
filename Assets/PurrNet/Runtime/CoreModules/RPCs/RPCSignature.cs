@@ -40,6 +40,7 @@ namespace PurrNet
         public IEnumerable<PlayerID> targetPlayerEnumerable;
         public IList<PlayerID> targetPlayerList;
         public StripCodeModeOverride stripCodeMode;
+        public bool deltaPacked;
 
         public DisposableList<PlayerID> GetTargets()
         {
@@ -58,7 +59,7 @@ namespace PurrNet
         [UsedImplicitly]
         public static RPCSignature Make(RPCType type, Channel channel, bool runLocally, bool requireOwnership,
             bool bufferLast, bool requireServer, bool excludeOwner, string name, bool isStatic, float asyncTimoutInSec,
-            CompressionLevel compressionLevel, bool excludeSender)
+            CompressionLevel compressionLevel, bool excludeSender, bool deltaPacked)
         {
             return new RPCSignature
             {
@@ -76,14 +77,15 @@ namespace PurrNet
                 isStatic = isStatic,
                 rpcName = name,
                 asyncTimeoutInSec = asyncTimoutInSec,
-                compressionLevel = compressionLevel
+                compressionLevel = compressionLevel,
+                deltaPacked = deltaPacked
             };
         }
 
         [UsedImplicitly]
         public static RPCSignature MakeWithTarget(RPCType type, Channel channel, bool runLocally, bool requireOwnership,
             bool bufferLast, bool requireServer, bool excludeOwner, string name, bool isStatic, float asyncTimoutInSec,
-            CompressionLevel compressionLevel, bool excludeSender, PlayerID? playerID, IEnumerable<PlayerID> players, IList<PlayerID> playersList)
+            CompressionLevel compressionLevel, bool excludeSender, bool deltaPacked, PlayerID? playerID, IEnumerable<PlayerID> players, IList<PlayerID> playersList)
         {
             return new RPCSignature
             {
@@ -101,7 +103,8 @@ namespace PurrNet
                 isStatic = isStatic,
                 rpcName = name,
                 asyncTimeoutInSec = asyncTimoutInSec,
-                compressionLevel = compressionLevel
+                compressionLevel = compressionLevel,
+                deltaPacked = deltaPacked
             };
         }
     }

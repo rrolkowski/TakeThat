@@ -28,7 +28,7 @@ namespace PurrNet
             this.oldValue = oldValue;
             this.index = index;
         }
-        
+
         public static SyncArrayChange<T> Set(T newValue, T oldValue, int index)
         {
             return new SyncArrayChange<T>(SyncArrayOperation.Set, newValue, oldValue, index);
@@ -48,7 +48,7 @@ namespace PurrNet
         {
             return new SyncArrayChange<T>(SyncArrayOperation.Resized, default(T), default(T), -1);
         }
-        
+
         public override string ToString()
         {
             string valueStr = $"Value: {value} | OldValue: {oldValue} | Operation: {operation} | Index: {index}";
@@ -417,7 +417,23 @@ namespace PurrNet
 
         private void InvokeChange(SyncArrayChange<T> change)
         {
-            onChanged?.Invoke(change);
+            try
+            {
+                onChanged?.Invoke(change);
+            }
+            catch (Exception e)
+            {
+                Debug.LogException(e);
+            }
+        }
+
+        public override void OnPoolReset()
+        {
+            onChanged = null;
+            _pendingChanges.Clear();
+            _lastSendTime = default;
+            _isDirty = default;
+            _wasLastDirty = default;
         }
 
         public void OnTick(float delta)

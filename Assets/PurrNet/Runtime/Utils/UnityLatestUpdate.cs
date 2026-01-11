@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 #if UNITY_EDITOR && PURR_LEAKS_CHECK
 using PurrNet.Pooling;
@@ -17,6 +18,69 @@ namespace PurrNet
         public static event Action onFixedUpdate;
 
         public static event Action onLatestUpdate;
+
+        private static readonly List<PriorityAction> _executeASAP = new();
+
+        struct PriorityAction
+        {
+            public int priority;
+            public int subPriority;
+            public Action action;
+        }
+
+        private void Awake()
+        {
+            TriggerPendingAsaps();
+        }
+
+        /// <summary>
+        /// Execute body as soon as possible, be it Update/LateUpdate/Start/Awake whatever
+        /// Higher priority value means it will be executed later
+        /// </summary>
+        /// <param name="action"></param>
+        /// <param name="priority"></param>
+        /// <param name="subPriority"></param>
+        public static void ExecuteAsap(Action action, int priority = 0, int subPriority = 0)
+        {
+            var item = new PriorityAction
+            {
+                priority = priority,
+                subPriority = subPriority,
+                action = action,
+            };
+
+            int insertIdx = _executeASAP.Count;
+
+            for (int i = 0; i < _executeASAP.Count; i++)
+            {
+                var cur = _executeASAP[i];
+                if (cur.priority > priority ||
+                    (cur.priority == priority && cur.subPriority > subPriority))
+                {
+                    insertIdx = i;
+                    break;
+                }
+            }
+
+            _executeASAP.Insert(insertIdx, item);
+        }
+
+        public static void TriggerPendingAsaps()
+        {
+            for (var i = 0; i < _executeASAP.Count; i++)
+            {
+                var action = _executeASAP[i];
+
+                try
+                {
+                    action.action?.Invoke();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                }
+            }
+        }
 
         public static Task Yield()
         {
@@ -50,9 +114,14 @@ namespace PurrNet
             }
         }
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
         private static void OnSubsystemRegistration()
         {
+            onUpdate = null;
+            onFixedUpdate = null;
+            onLatestUpdate = null;
+            _executeASAP.Clear();
+
             if (_instance)
                 return;
 
@@ -69,8 +138,24 @@ namespace PurrNet
         private float _sweep;
 #endif
 
+        private void OnEnable()
+        {
+            TriggerPendingAsaps();
+        }
+
+        private void OnDisable()
+        {
+            TriggerPendingAsaps();
+        }
+
+        private void OnDestroy()
+        {
+            TriggerPendingAsaps();
+        }
+
         private void Update()
         {
+            TriggerPendingAsaps();
             onUpdate?.Invoke();
 #if UNITY_EDITOR && PURR_LEAKS_CHECK
             _sweep += Time.deltaTime;
@@ -85,11 +170,13 @@ namespace PurrNet
 
         private void FixedUpdate()
         {
+            TriggerPendingAsaps();
             onFixedUpdate?.Invoke();
         }
 
         private void LateUpdate()
         {
+            TriggerPendingAsaps();
             onLatestUpdate?.Invoke();
         }
     }

@@ -9,6 +9,7 @@ namespace PurrNet
     public class NetworkPrefabsEditor : UnityEditor.Editor
     {
         private NetworkPrefabs networkPrefabs;
+        private SerializedProperty linkedNetworkPrefabs;
         private SerializedProperty prefabs;
         private bool? allPoolingState = null;
         private ReorderableList reorderableList;
@@ -21,6 +22,7 @@ namespace PurrNet
         private void OnEnable()
         {
             networkPrefabs = (NetworkPrefabs)target;
+            linkedNetworkPrefabs = serializedObject.FindProperty("linkedNetworkPrefabs");
             prefabs = serializedObject.FindProperty("prefabs");
 
             if (networkPrefabs.autoGenerate)
@@ -179,6 +181,9 @@ namespace PurrNet
                 prefabs = serializedObject.FindProperty("prefabs");
                 UpdateAllPoolingState();
             }
+            
+            GUILayout.Space(10);
+            EditorGUILayout.PropertyField(linkedNetworkPrefabs, true);
 
             GUILayout.Space(10);
 

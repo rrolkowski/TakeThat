@@ -19,6 +19,7 @@ namespace PurrNet.Editor
         static object _lock = new object();
 
         public StripCodeMode stripCodeMode = StripCodeMode.DoNotStrip;
+        public GuardFailureAction guardFailureAction = GuardFailureAction.ReturnDefault;
 
         public ToolbarMode toolbarMode = ToolbarMode.Full;
         public bool toolbarTransportDropDown;

@@ -48,11 +48,6 @@ namespace PurrNet.Codegen
         {
             var name = compiledAssembly.Name;
 
-#if UNITY_PLAYMODE
-            if (name.Contains("Unity.Multiplayer.Playmode.Workflow.Editor"))
-                return true;
-#endif
-
             if (name.Contains("NuGetForUnity"))
                 return false;
 
@@ -120,9 +115,9 @@ namespace PurrNet.Codegen
             {
                 if (attribute.AttributeType.FullName == typeof(ServerRpcAttribute).FullName)
                 {
-                    if (attribute.ConstructorArguments.Count != 6)
+                    if (attribute.ConstructorArguments.Count != 7)
                     {
-                        Error(messages, "ServerRPC attribute must have 6 arguments", method);
+                        Error(messages, "ServerRPC attribute must have 7 arguments", method);
                         return null;
                     }
 
@@ -132,6 +127,7 @@ namespace PurrNet.Codegen
                     var compressionLevel = (CompressionLevel)attribute.ConstructorArguments[3].Value;
                     var asyncTimeoutInSec = (float)attribute.ConstructorArguments[4].Value;
                     var stripCode = (StripCodeModeOverride)attribute.ConstructorArguments[5].Value;
+                    var deltaPacked = (bool)attribute.ConstructorArguments[6].Value;
 
                     data = new RPCSignature
                     {
@@ -145,15 +141,16 @@ namespace PurrNet.Codegen
                         isStatic = method.IsStatic,
                         asyncTimeoutInSec = asyncTimeoutInSec,
                         compressionLevel = compressionLevel,
-                        stripCodeMode = stripCode
+                        stripCodeMode = stripCode,
+                        deltaPacked = deltaPacked
                     };
                     rpcCount++;
                 }
                 else if (attribute.AttributeType.FullName == typeof(ObserversRpcAttribute).FullName)
                 {
-                    if (attribute.ConstructorArguments.Count != 8)
+                    if (attribute.ConstructorArguments.Count != 9)
                     {
-                        Error(messages, "ObserversRPC attribute must have 8 arguments", method);
+                        Error(messages, "ObserversRPC attribute must have 9 arguments", method);
                         return null;
                     }
 
@@ -165,6 +162,7 @@ namespace PurrNet.Codegen
                     var excludeSender = (bool)attribute.ConstructorArguments[5].Value;
                     var compressionLevel = (CompressionLevel)attribute.ConstructorArguments[6].Value;
                     var asyncTimeoutInSec = (float)attribute.ConstructorArguments[7].Value;
+                    var deltaPacked = (bool)attribute.ConstructorArguments[8].Value;
 
                     data = new RPCSignature
                     {
@@ -178,15 +176,16 @@ namespace PurrNet.Codegen
                         excludeSender = excludeSender,
                         isStatic = method.IsStatic,
                         asyncTimeoutInSec = asyncTimeoutInSec,
-                        compressionLevel = compressionLevel
+                        compressionLevel = compressionLevel,
+                        deltaPacked = deltaPacked
                     };
                     rpcCount++;
                 }
                 else if (attribute.AttributeType.FullName == typeof(TargetRpcAttribute).FullName)
                 {
-                    if (attribute.ConstructorArguments.Count != 6)
+                    if (attribute.ConstructorArguments.Count != 7)
                     {
-                        Error(messages, "TargetRPC attribute must have 6 arguments", method);
+                        Error(messages, "TargetRPC attribute must have 7 arguments", method);
                         return null;
                     }
 
@@ -196,6 +195,7 @@ namespace PurrNet.Codegen
                     var requireServer = (bool)attribute.ConstructorArguments[3].Value;
                     var compressionLevel = (CompressionLevel)attribute.ConstructorArguments[4].Value;
                     var asyncTimeoutInSec = (float)attribute.ConstructorArguments[5].Value;
+                    var deltaPacked = (bool)attribute.ConstructorArguments[6].Value;
 
                     data = new RPCSignature
                     {
@@ -209,7 +209,8 @@ namespace PurrNet.Codegen
                         excludeSender = false,
                         isStatic = method.IsStatic,
                         asyncTimeoutInSec = asyncTimeoutInSec,
-                        compressionLevel = compressionLevel
+                        compressionLevel = compressionLevel,
+                        deltaPacked = deltaPacked
                     };
                     rpcCount++;
                 }
@@ -228,24 +229,35 @@ namespace PurrNet.Codegen
 
         public static void Error(ICollection<DiagnosticMessage> messages, string message, MethodDefinition method)
         {
-            if (method.DebugInformation.HasSequencePoints)
+            try
             {
-                var first = method.DebugInformation.SequencePoints[0];
-                string file = first.Document.Url;
-                if (!string.IsNullOrEmpty(file))
-                    file = '/' + file[file.IndexOf("Assets", StringComparison.Ordinal)..].Replace('\\', '/');
-                else file = string.Empty;
-
-                messages.Add(new DiagnosticMessage
+                if (method.DebugInformation.HasSequencePoints)
                 {
-                    DiagnosticType = DiagnosticType.Error,
-                    MessageData = message,
-                    Column = first.StartColumn,
-                    Line = first.StartLine,
-                    File = file
-                });
+                    var first = method.DebugInformation.SequencePoints[0];
+                    string file = first.Document.Url;
+                    if (!string.IsNullOrEmpty(file))
+                        file = '/' + file[file.IndexOf("Assets", StringComparison.Ordinal)..].Replace('\\', '/');
+                    else file = string.Empty;
+
+                    messages.Add(new DiagnosticMessage
+                    {
+                        DiagnosticType = DiagnosticType.Error,
+                        MessageData = message,
+                        Column = first.StartColumn,
+                        Line = first.StartLine,
+                        File = file
+                    });
+                }
+                else
+                {
+                    messages.Add(new DiagnosticMessage
+                    {
+                        DiagnosticType = DiagnosticType.Error,
+                        MessageData = $"[{method.DeclaringType.FullName}] {message}"
+                    });
+                }
             }
-            else
+            catch
             {
                 messages.Add(new DiagnosticMessage
                 {
@@ -572,6 +584,7 @@ namespace PurrNet.Codegen
             var responderCoroutine = rpcReqRespType.GetMethod("CompleteRequestWithCoroutine").Import(module);
             var responderUniTaskWithoutResponse =
                 rpcReqRespType.GetMethod("CompleteRequestWithUniTaskEmptyResponse").Import(module);
+            var RPCPacketPackerType = module.GetTypeDefinition<RPCPacketPacker>();
 
             var localPlayerProp = identityType.GetProperty("localPlayerForced");
             var localPlayerGetter = localPlayerProp.GetMethod.Import(module);
@@ -589,13 +602,51 @@ namespace PurrNet.Codegen
             var mainManagerGetter = mainManagerProp.GetMethod.Import(module);
 
             VariableDefinition reqId = null;
+            VariableDefinition rpcPacker = null;
+
+
+            bool useDeltaPacking = rpcMethod.Signature.deltaPacked && rpcMethod.Signature.type != RPCType.ServerRPC;
+
+            // create delta packer
+            if (useDeltaPacking)
+            {
+                rpcPacker = new VariableDefinition(RPCPacketPackerType.Import(module));
+                newMethod.Body.Variables.Add(rpcPacker);
+
+                var createPackerForRPC = RPCPacketPackerType.GetMethod(GetCreateWithInfoName(rpcMethod, isNetworkClass))
+                    .Import(module);
+                //NetworkManager manager, RPCPacket context, RPCInfo info
+                PushNetworkManager(module, code, isNetworkClass, newMethod.IsStatic);
+                // PushNetworkManager(newMethod, isNetworkClass, code, mainManagerGetter, getNetworkManagerModule, getNetworkManager);
+
+                if (rpcMethod.Signature.isStatic)
+                {
+                    code.Append(Instruction.Create(OpCodes.Ldarg_1));
+                    code.Append(Instruction.Create(OpCodes.Ldarg_2));
+                }
+                else
+                {
+                    code.Append(Instruction.Create(OpCodes.Ldarg_2));
+                    code.Append(Instruction.Create(OpCodes.Ldarg_3));
+                }
+
+                code.Append(Instruction.Create(OpCodes.Call, createPackerForRPC));
+                code.Append(Instruction.Create(OpCodes.Stloc, rpcPacker));
+            }
 
             if (returnMode != ReturnMode.Void)
             {
                 reqId = new VariableDefinition(module.TypeSystem.UInt32);
                 newMethod.Body.Variables.Add(reqId);
 
-                var serializer = CreateSerializer(module, module.TypeSystem.UInt32, false);
+                MethodReference serializer;
+
+                if (useDeltaPacking)
+                {
+                    serializer = CreateDeltaSerializer(module, module.TypeSystem.UInt32, rpcPacker, false);
+                    code.Append(Instruction.Create(OpCodes.Ldloca, rpcPacker));
+                }
+                else serializer = CreateSerializer(module, module.TypeSystem.UInt32, false);
 
                 code.Append(Instruction.Create(OpCodes.Ldarg, stream));
                 code.Append(Instruction.Create(OpCodes.Ldloca, reqId));
@@ -640,7 +691,14 @@ namespace PurrNet.Codegen
                     continue;
                 }
 
-                var serialize = CreateSerializer(module, param.ParameterType, false);
+                MethodReference serialize;
+
+                if (useDeltaPacking)
+                {
+                    serialize = CreateDeltaSerializer(module, param.ParameterType, rpcPacker, false);
+                    code.Append(Instruction.Create(OpCodes.Ldloca, rpcPacker));
+                }
+                else serialize = CreateSerializer(module, param.ParameterType, false);
 
                 code.Append(Instruction.Create(OpCodes.Ldarg, stream));
                 code.Append(Instruction.Create(OpCodes.Ldloca, variable));
@@ -651,8 +709,12 @@ namespace PurrNet.Codegen
                 code.Append(Instruction.Create(OpCodes.Ldarg_0));
 
             var vars = newMethod.Body.Variables;
+            int startIdx;
+            if (useDeltaPacking)
+                startIdx = (reqId == null ? 1 : 2);
+            else startIdx = (reqId == null ? 0 : 1);
 
-            for (var j = reqId == null ? 0 : 1; j < vars.Count; j++)
+            for (var j = startIdx; j < vars.Count; j++)
             {
                 code.Append(Instruction.Create(OpCodes.Ldloc, vars[j]));
             }
@@ -707,6 +769,40 @@ namespace PurrNet.Codegen
                     });
                 }
             }
+        }
+
+        private static string GetCreateWithInfoName(RPCMethod rpcMethod, bool isNetworkClass)
+        {
+            string methodName;
+
+            if (isNetworkClass)
+            {
+                methodName = "CreateChildWithInfo";
+            }
+            else if (rpcMethod.Signature.isStatic)
+            {
+                methodName = "CreateStaticWithInfo";
+            }
+            else methodName = "CreateWithInfo";
+
+            return methodName;
+        }
+
+        private static string GetCreateName(RPCMethod rpcMethod, bool isNetworkClass)
+        {
+            string methodName;
+
+            if (isNetworkClass)
+            {
+                methodName = "CreateChild";
+            }
+            else if (rpcMethod.Signature.isStatic)
+            {
+                methodName = "CreateStatic";
+            }
+            else methodName = "Create";
+
+            return methodName;
         }
 
         private static void PushNetworkManager(ModuleDefinition module, ILProcessor code, bool isNetworkClass, bool isStatic)
@@ -775,6 +871,7 @@ namespace PurrNet.Codegen
             MethodDefinition newMethod,
             ParameterDefinition stream, ParameterDefinition info, bool isNetworkClass)
         {
+            var genericRpcHeaderType = module.GetTypeDefinition<GenericRPCHeader>();
             var identityType = module.GetTypeDefinition<NetworkIdentity>();
             var rpcReqRespType = module.GetTypeDefinition<RpcRequestResponseModule>();
             var managerType = module.GetTypeDefinition<NetworkManager>();
@@ -788,22 +885,32 @@ namespace PurrNet.Codegen
             var responderTask = rpcReqRespType.GetMethod("CompleteRequestWithResponseObject", true).Import(module);
             var responderUniTask = rpcReqRespType.GetMethod("CompleteRequestWithUniTaskObject", true).Import(module);
 
+            var responderTaskObject = rpcReqRespType.GetMethod("CompleteRequestWithResponseObject", false).Import(module);
+            var responderUniTaskObject = rpcReqRespType.GetMethod("CompleteRequestWithUniTaskObject", false).Import(module);
+
             var localPlayerProp = identityType.GetProperty("localPlayerForced");
             var localPlayerGetter = localPlayerProp.GetMethod.Import(module);
 
-            var genericRpcHeaderType = module.GetTypeDefinition<GenericRPCHeader>();
             var code = newMethod.Body.GetILProcessor();
-            var readHeaderMethod = identityType.GetMethod("ReadGenericHeader").Import(module);
+            var createGenericHeader = genericRpcHeaderType.GetMethod("CreateGenericHeader").Import(module);
+            var saveReadHashMethod = genericRpcHeaderType.GetMethod("SaveReadHash").Import(module);
 
             var setInfo = genericRpcHeaderType.GetMethod("SetInfo").Import(module);
             var readGeneric = genericRpcHeaderType.GetMethod("Read").Import(module);
             var readT = genericRpcHeaderType.GetMethod("Read", true).Import(module);
             var setPlayerId = genericRpcHeaderType.GetMethod("SetPlayerId").Import(module);
+            var getGenericTypeAt = genericRpcHeaderType.GetMethod("GetTypeAt").Import(module);
+            var SaveReadValueNonGeneric = genericRpcHeaderType.GetMethod("SaveReadValue").Import(module);
+            var SaveReadValueGeneric = genericRpcHeaderType.GetMethod("SaveReadValue", true).Import(module);
+
             var mainManagerProp = managerType.GetProperty("main");
             var mainManagerGetter = mainManagerProp.GetMethod.Import(module);
 
             var getNetworkManagerModule = networkModule.GetProperty("networkManager").GetMethod.Import(module);
             var getNetworkManager = identityType.GetProperty("networkManager").GetMethod.Import(module);
+            var RPCPacketPackerType = module.GetTypeDefinition<RPCPacketPacker>();
+            var ReadObjectMethod = RPCPacketPackerType.GetMethod("ReadObject").Import(module);
+            var ReadObjectGenMethod = RPCPacketPackerType.GetMethod("ReadObject", true).Import(module);
 
             var rpcModule = module.GetTypeDefinition<RPCModule>();
             var nclassType = module.GetTypeDefinition<NetworkModule>();
@@ -821,12 +928,48 @@ namespace PurrNet.Codegen
             int paramCount = originalMethod.Parameters.Count;
             int genericParamCount = originalMethod.GenericParameters.Count;
 
+            bool useDeltaPacking = rpcMethod.Signature.deltaPacked && rpcMethod.Signature.type != RPCType.ServerRPC;
+
             VariableDefinition requestId = null;
+            VariableDefinition rpcPacker = null;
+            var genericParamCountValue = new VariableDefinition(module.TypeSystem.UInt32);
+
             var headerValue = new VariableDefinition(genericRpcHeaderType.Import(module));
             newMethod.Body.Variables.Add(headerValue);
+            newMethod.Body.Variables.Add(genericParamCountValue);
+
+            // create delta packer
+            if (useDeltaPacking)
+            {
+                rpcPacker = new VariableDefinition(RPCPacketPackerType.Import(module));
+                newMethod.Body.Variables.Add(rpcPacker);
+
+                var createPackerForRPC = RPCPacketPackerType.GetMethod(GetCreateWithInfoName(rpcMethod, isNetworkClass))
+                    .Import(module);
+                //NetworkManager manager, RPCPacket context, RPCInfo info
+                PushNetworkManager(newMethod, isNetworkClass, code, mainManagerGetter, getNetworkManagerModule, getNetworkManager);
+
+                if (rpcMethod.Signature.isStatic)
+                {
+                    code.Append(Instruction.Create(OpCodes.Ldarg_1));
+                    code.Append(Instruction.Create(OpCodes.Ldarg_2));
+                }
+                else
+                {
+                    code.Append(Instruction.Create(OpCodes.Ldarg_2));
+                    code.Append(Instruction.Create(OpCodes.Ldarg_3));
+                }
+
+                code.Append(Instruction.Create(OpCodes.Call, createPackerForRPC));
+                code.Append(Instruction.Create(OpCodes.Stloc, rpcPacker));
+            }
 
             bool isValidReturn = ValidateReturnType(originalMethod, out var returnMode);
-            var serializeUint = CreateSerializer(module, module.TypeSystem.UInt32, false);
+            MethodReference serializeUint;
+
+            serializeUint = useDeltaPacking ?
+                CreateDeltaSerializer(module, module.TypeSystem.UInt32, rpcPacker, false) :
+                CreateSerializer(module, module.TypeSystem.UInt32, false);
 
             if (!isValidReturn)
             {
@@ -838,6 +981,8 @@ namespace PurrNet.Codegen
                 requestId = new VariableDefinition(module.TypeSystem.UInt32);
                 newMethod.Body.Variables.Add(requestId);
 
+                if (useDeltaPacking)
+                    code.Append(Instruction.Create(OpCodes.Ldloca, rpcPacker));
                 code.Append(Instruction.Create(OpCodes.Ldarg, stream));
                 code.Append(Instruction.Create(OpCodes.Ldloca, requestId));
                 code.Append(Instruction.Create(OpCodes.Call, serializeUint));
@@ -848,8 +993,24 @@ namespace PurrNet.Codegen
             code.Append(Instruction.Create(OpCodes.Ldarg, info));
             code.Append(Instruction.Create(OpCodes.Ldc_I4, genericParamCount));
             code.Append(Instruction.Create(OpCodes.Ldc_I4, paramCount));
-            code.Append(Instruction.Create(OpCodes.Ldloca, headerValue));
-            code.Append(Instruction.Create(OpCodes.Call, readHeaderMethod));
+            code.Append(Instruction.Create(OpCodes.Call, createGenericHeader));
+            code.Append(Instruction.Create(OpCodes.Stloc, headerValue));
+
+            for (int i = 0; i < genericParamCount; i++)
+            {
+                // read uint hash
+                if (useDeltaPacking)
+                    code.Append(Instruction.Create(OpCodes.Ldloca, rpcPacker));
+                code.Append(Instruction.Create(OpCodes.Ldarg, stream));
+                code.Append(Instruction.Create(OpCodes.Ldloca, genericParamCountValue));
+                code.Append(Instruction.Create(OpCodes.Call, serializeUint));
+
+                // call GenericRPCHeader.SaveReadHash(uint hash, int index)
+                code.Append(Instruction.Create(OpCodes.Ldloca, headerValue));
+                code.Append(Instruction.Create(OpCodes.Ldloc, genericParamCountValue));
+                code.Append(Instruction.Create(OpCodes.Ldc_I4, i));
+                code.Append(Instruction.Create(OpCodes.Call, saveReadHashMethod));
+            }
 
             // read generic parameters
             for (var p = 0; p < paramCount; p++)
@@ -897,18 +1058,62 @@ namespace PurrNet.Codegen
                 if (genericIdx != -1)
                 {
                     code.Append(Instruction.Create(OpCodes.Ldloca, headerValue));
-                    code.Append(Instruction.Create(OpCodes.Ldc_I4, genericIdx));
-                    code.Append(Instruction.Create(OpCodes.Ldc_I4, p));
-                    code.Append(Instruction.Create(OpCodes.Call, readGeneric));
+                    if (useDeltaPacking)
+                    {
+                        // OBJ in stack
+                        {
+                            code.Append(Instruction.Create(OpCodes.Ldloca, rpcPacker));
+                            code.Append(Instruction.Create(OpCodes.Ldarg, stream));
+
+                            // GetTypeAt(genericIdx)
+                            code.Append(Instruction.Create(OpCodes.Ldloca, headerValue));
+                            code.Append(Instruction.Create(OpCodes.Ldc_I4, genericIdx));
+                            code.Append(Instruction.Create(OpCodes.Call, getGenericTypeAt));
+
+                            code.Append(Instruction.Create(OpCodes.Call, ReadObjectMethod));
+                        }
+
+                        code.Append(Instruction.Create(OpCodes.Ldc_I4, p));
+                        code.Append(Instruction.Create(OpCodes.Call, SaveReadValueNonGeneric));
+                    }
+                    else
+                    {
+                        code.Append(Instruction.Create(OpCodes.Ldc_I4, genericIdx));
+                        code.Append(Instruction.Create(OpCodes.Ldc_I4, p));
+                        code.Append(Instruction.Create(OpCodes.Call, readGeneric));
+                    }
                 }
                 else
                 {
-                    var readAny = new GenericInstanceMethod(readT);
-                    readAny.GenericArguments.Add(param.ParameterType);
+                    if (useDeltaPacking)
+                    {
+                        code.Append(Instruction.Create(OpCodes.Ldloca, headerValue));
 
-                    code.Append(Instruction.Create(OpCodes.Ldloca, headerValue));
-                    code.Append(Instruction.Create(OpCodes.Ldc_I4, p));
-                    code.Append(Instruction.Create(OpCodes.Call, readAny));
+                        // OBJ in stack
+                        {
+                            var readAny = new GenericInstanceMethod(ReadObjectGenMethod);
+                            readAny.GenericArguments.Add(param.ParameterType);
+
+                            code.Append(Instruction.Create(OpCodes.Ldloca, rpcPacker));
+                            code.Append(Instruction.Create(OpCodes.Ldarg, stream));
+                            code.Append(Instruction.Create(OpCodes.Call, readAny));
+                        }
+
+                        var saveAny = new GenericInstanceMethod(SaveReadValueGeneric);
+                        saveAny.GenericArguments.Add(param.ParameterType);
+
+                        code.Append(Instruction.Create(OpCodes.Ldc_I4, p));
+                        code.Append(Instruction.Create(OpCodes.Call, saveAny));
+                    }
+                    else
+                    {
+                        var readAny = new GenericInstanceMethod(readT);
+                        readAny.GenericArguments.Add(param.ParameterType);
+
+                        code.Append(Instruction.Create(OpCodes.Ldloca, headerValue));
+                        code.Append(Instruction.Create(OpCodes.Ldc_I4, p));
+                        code.Append(Instruction.Create(OpCodes.Call, readAny));
+                    }
                 }
             }
 
@@ -934,30 +1139,32 @@ namespace PurrNet.Codegen
 
                     code.Append(Instruction.Create(OpCodes.Ldarg, info));
                     code.Append(Instruction.Create(OpCodes.Ldloc, requestId));
-                    // load networkManager
-                    if (newMethod.IsStatic)
-                    {
-                        code.Append(Instruction.Create(OpCodes.Call, mainManagerGetter));
-                    }
-                    else
-                    {
-                        code.Append(Instruction.Create(OpCodes.Ldarg_0));
-                        code.Append(isNetworkClass
-                            ? Instruction.Create(OpCodes.Call, getNetworkManagerModule)
-                            : Instruction.Create(OpCodes.Call, getNetworkManager));
-                    }
+                    PushNetworkManager(newMethod, isNetworkClass, code, mainManagerGetter, getNetworkManagerModule, getNetworkManager);
+
+                    var taskType = genericInstance.GenericArguments[0];
+                    bool isTaskTypeConcrete = IsConcreteType(taskType, out var concreteTaskType);
 
                     if (returnMode == ReturnMode.Task)
                     {
-                        var genericResponse = new GenericInstanceMethod(responderTask);
-                        genericResponse.GenericArguments.Add(genericInstance.GenericArguments[0]);
-                        code.Append(Instruction.Create(OpCodes.Call, genericResponse));
+                        if (isTaskTypeConcrete)
+                        {
+                            var genericResponse = new GenericInstanceMethod(responderTask);
+                            genericResponse.GenericArguments.Add(concreteTaskType);
+                            code.Append(Instruction.Create(OpCodes.Call, genericResponse.Import(module)));
+                        }
+                        else code.Append(Instruction.Create(OpCodes.Call, responderTaskObject));
                     }
                     else
                     {
-                        var genericResponse = new GenericInstanceMethod(responderUniTask);
-                        genericResponse.GenericArguments.Add(genericInstance.GenericArguments[0]);
-                        code.Append(Instruction.Create(OpCodes.Call, genericResponse));
+                        //code.Append(Instruction.Create(OpCodes.Call, responderUniTaskObject));
+
+                        if (isTaskTypeConcrete)
+                        {
+                            var genericResponse = new GenericInstanceMethod(responderUniTask);
+                            genericResponse.GenericArguments.Add(concreteTaskType);
+                            code.Append(Instruction.Create(OpCodes.Call, genericResponse.Import(module)));
+                        }
+                        else code.Append(Instruction.Create(OpCodes.Call, responderUniTaskObject));
                     }
                 }
                 else if (originalMethod.ReturnType != module.TypeSystem.Void)
@@ -990,6 +1197,23 @@ namespace PurrNet.Codegen
             else
             {
                 code.Append(Instruction.Create(OpCodes.Pop));
+            }
+        }
+
+        private static void PushNetworkManager(MethodDefinition newMethod, bool isNetworkClass, ILProcessor code,
+            MethodReference mainManagerGetter, MethodReference getNetworkManagerModule, MethodReference getNetworkManager)
+        {
+            // load networkManager
+            if (newMethod.IsStatic)
+            {
+                code.Append(Instruction.Create(OpCodes.Call, mainManagerGetter));
+            }
+            else
+            {
+                code.Append(Instruction.Create(OpCodes.Ldarg_0));
+                code.Append(isNetworkClass
+                    ? Instruction.Create(OpCodes.Call, getNetworkManagerModule)
+                    : Instruction.Create(OpCodes.Call, getNetworkManager));
             }
         }
 
@@ -1129,6 +1353,26 @@ namespace PurrNet.Codegen
             }
         }
 
+        static GuardFailureAction GetMode(PurrNetSettings settings, GuardFailureActionOverride overrideAction)
+        {
+            switch (overrideAction)
+            {
+                case GuardFailureActionOverride.ReturnDefault:
+                    return GuardFailureAction.ReturnDefault;
+                case GuardFailureActionOverride.ThrowException:
+                    return GuardFailureAction.ThrowException;
+                case GuardFailureActionOverride.LogWarning:
+                    return GuardFailureAction.LogWarning;
+                case GuardFailureActionOverride.LogError:
+                    return GuardFailureAction.LogError;
+                case GuardFailureActionOverride.Ignore:
+                    return GuardFailureAction.Ignore;
+                case GuardFailureActionOverride.Settings:
+                default:
+                    return settings.guardFailureAction;
+            }
+        }
+
         private static void StripBody(MethodDefinition method, string methodName, PurrNetSettings settings, StripCodeModeOverride overrideMode)
         {
             var mode = GetMode(settings, overrideMode);
@@ -1259,7 +1503,10 @@ namespace PurrNet.Codegen
 
             if (!isValidReturn)
             {
-                Error(messages, $"RPC '{method.Name}' RPC must return <b>void</b>, <b>Task</b> or <b>UniTask</b>",
+                Error(messages,
+                    method.ReturnType.Name.Contains("UniTask")
+                        ? $"RPC '{method.Name}' uses <b>UniTask</b>, you need to enable support under `Tools/PurrNet/Packages/Install UniTask` or define the `UNITASK_PURRNET_SUPPORT` symbol."
+                        : $"RPC '{method.Name}' RPC must return <b>void</b>, <b>Task</b> or <b>UniTask</b>",
                     method);
                 return null;
             }
@@ -1297,6 +1544,9 @@ namespace PurrNet.Codegen
 
             foreach (var param in method.CustomAttributes)
                 newMethod.CustomAttributes.Add(param);
+
+            if (method.HasGenericParameters)
+                method.IsPublic = true;
 
             // add preserve attribute to newMethod
             var preserveAttribute = module.GetTypeDefinition<PreserveAttribute>();
@@ -1341,6 +1591,7 @@ namespace PurrNet.Codegen
             var rpcSignatureType = module.GetTypeDefinition<RPCSignature>();
             var reqRespModule = module.GetTypeDefinition<RpcRequestResponseModule>();
             var packerType = module.GetTypeDefinition(typeof(Packer)).Import(module);
+            var RPCPacketPackerType = module.GetTypeDefinition<RPCPacketPacker>();
 
             var allocStreamMethod = rpcType.GetMethod("AllocStream").Import(module);
             var freeStreamMethod = rpcType.GetMethod("FreeStream").Import(module);
@@ -1399,18 +1650,110 @@ namespace PurrNet.Codegen
             PushRPCSignature(module, code, methodRpc, false, isNetworkClass);
             code.Append(Instruction.Create(OpCodes.Stloc, rpcSignature));
 
-            if (methodRpc.Signature.type == RPCType.ServerRPC)
+            var playerType = module.GetTypeDefinition<PlayerID>().Import(module);
+            var disposableListType = module.GetTypeDefinition(typeof(DisposableList<>));
+
+            var playersListType = new GenericInstanceType(disposableListType);
+            playersListType.GenericArguments.Add(playerType);
+
+            var playersList = new VariableDefinition(playersListType.Import(module));
+            var iterator = new VariableDefinition(module.TypeSystem.Int32);
+            VariableDefinition currentDeltaPlayerTarget = null;
+            VariableDefinition rpcPacker = null;
+
+            Instruction playersLoopStart = null;
+            Instruction playersLoopEnd = null;
+
+            bool hasMultipleTargets = methodRpc.Signature.type == RPCType.ObserversRPC ||
+                                      methodRpc.Signature.targetPlayerEnumerable != null ||
+                                      methodRpc.Signature.targetPlayerList != null;
+
+            bool useDeltaPacking = methodRpc.Signature.deltaPacked && methodRpc.Signature.type != RPCType.ServerRPC;
+
+            if (useDeltaPacking)
             {
-                PutIsServerOnStack(module, methodRpc, isNetworkClass, code, moduleType, identityType);
-                code.Append(Instruction.Create(OpCodes.Brtrue, executeRunLocally));
+                rpcPacker = new VariableDefinition(RPCPacketPackerType.Import(module));
+                currentDeltaPlayerTarget = new VariableDefinition(playerType.Import(module));
+
+                var rpcSig_getTargets = rpcSignatureType.GetMethod("GetTargets").Import(module);
+
+                newMethod.Body.Variables.Add(playersList);
+                newMethod.Body.Variables.Add(currentDeltaPlayerTarget);
+                newMethod.Body.Variables.Add(iterator);
+                newMethod.Body.Variables.Add(rpcPacker);
+
+                if (hasMultipleTargets)
+                {
+                    playersLoopEnd = Instruction.Create(OpCodes.Nop);
+
+                    // playersList = rpcSignature.GetTargets() or GetObservers(signature);
+                    if (methodRpc.Signature.type == RPCType.ObserversRPC)
+                    {
+                        var parentType = GetParentType(module, isNetworkClass, methodRpc.Signature.isStatic);
+                        var getObservers = parentType.GetMethod("GetObservers").Import(module);
+                        // signature
+                        if (!methodRpc.Signature.isStatic)
+                            code.Append(Instruction.Create(OpCodes.Ldarg_0));
+                        code.Append(Instruction.Create(OpCodes.Ldloc, rpcSignature));
+                        code.Append(Instruction.Create(OpCodes.Call, getObservers));
+                    }
+                    else code.Append(Instruction.Create(OpCodes.Call, rpcSig_getTargets));
+
+                    code.Append(Instruction.Create(OpCodes.Stloc, playersList));
+
+                    // i = targets.Count;
+                    code.Append(Instruction.Create(OpCodes.Ldloca, playersList));
+                    var prop = disposableListType.GetProperty("Count");
+                    var methodDef = prop.GetMethod;
+                    var methodRef = new MethodReference(methodDef.Name, methodDef.ReturnType, playersListType)
+                    {
+                        HasThis = true
+                    };
+
+                    code.Append(Instruction.Create(OpCodes.Call, methodRef.Import(module)));
+                    code.Append(Instruction.Create(OpCodes.Ldc_I4_1));
+                    code.Append(Instruction.Create(OpCodes.Sub));
+                    code.Append(Instruction.Create(OpCodes.Stloc, iterator));
+
+                    // while (i >= 0)
+                    playersLoopStart = Instruction.Create(OpCodes.Ldloc, iterator);
+                    code.Append(playersLoopStart);
+                    code.Append(Instruction.Create(OpCodes.Ldc_I4_0));
+                    code.Append(Instruction.Create(OpCodes.Blt, playersLoopEnd));
+                    // loop content
+
+                    // this.ModifyManyToOne(ref signature, players.GetAt(i));
+                    var rpcModule = module.GetTypeDefinition<RPCModule>();
+                    var modifyManyToOne = rpcModule.GetMethod("ModifyManyToOne").Import(module);
+                    // ref signature
+                    code.Append(Instruction.Create(OpCodes.Ldloca, rpcSignature));
+                    // players.GetAt(i)
+                    var getAtConcrete = playersListType.GetMethodRef("GetAt");
+                    code.Append(Instruction.Create(OpCodes.Ldloca, playersList));
+                    code.Append(Instruction.Create(OpCodes.Ldloc, iterator));
+                    code.Append(Instruction.Create(OpCodes.Call, getAtConcrete.Import(module)));
+                    code.Append(Instruction.Create(OpCodes.Dup));
+                    code.Append(Instruction.Create(OpCodes.Stloc, currentDeltaPlayerTarget));
+                    // ();
+                    code.Append(Instruction.Create(OpCodes.Call, modifyManyToOne));
+                }
             }
-            else if (methodRpc.Signature.type == RPCType.TargetRPC && GetArgType(newMethod.Parameters[0].ParameterType) == TargetArgType.Player)
+
+            switch (methodRpc.Signature.type)
             {
-                PushLocalPlayerProp(module, code, isNetworkClass, methodRpc.Signature.isStatic);
-                code.Append(Instruction.Create(OpCodes.Ldarg_S, newMethod.Parameters[0]));
-                var areEqualMethod = rpcType.GetMethod("ArePlayersEqual", false).Import(module);
-                code.Append(Instruction.Create(OpCodes.Call, areEqualMethod));
-                code.Append(Instruction.Create(OpCodes.Brtrue, executeRunLocally));
+                case RPCType.ServerRPC:
+                    PutIsServerOnStack(module, methodRpc, isNetworkClass, code, moduleType, identityType);
+                    code.Append(Instruction.Create(OpCodes.Brtrue, executeRunLocally));
+                    break;
+                case RPCType.TargetRPC when GetArgType(newMethod.Parameters[0].ParameterType) == TargetArgType.Player:
+                {
+                    PushLocalPlayerProp(module, code, isNetworkClass, methodRpc.Signature.isStatic);
+                    code.Append(Instruction.Create(OpCodes.Ldarg_S, newMethod.Parameters[0]));
+                    var areEqualMethod = rpcType.GetMethod("ArePlayersEqual", false).Import(module);
+                    code.Append(Instruction.Create(OpCodes.Call, areEqualMethod));
+                    code.Append(Instruction.Create(OpCodes.Brtrue, executeRunLocally));
+                    break;
+                }
             }
 
             if (returnMode != ReturnMode.Void)
@@ -1517,9 +1860,32 @@ namespace PurrNet.Codegen
             code.Append(Instruction.Create(OpCodes.Call, allocStreamMethod));
             code.Append(Instruction.Create(OpCodes.Stloc, streamVariable));
 
+            CreateAndSetPacket(module, id, methodRpc, isNetworkClass, rpcType, method, code, streamVariable, getId, getSceneId, rpcDataVariable);
+
+            // create delta packer
+            if (useDeltaPacking)
+            {
+                var createPackerForRPC = RPCPacketPackerType.GetMethod(GetCreateName(methodRpc, isNetworkClass))
+                    .Import(module);
+                //NetworkManager manager, RPCPacket context, RPCSignature signature, PlayerID target
+                PushNetworkManager(module, code, isNetworkClass, methodRpc.Signature.isStatic);
+                code.Append(Instruction.Create(OpCodes.Ldloc, rpcDataVariable));
+                code.Append(Instruction.Create(OpCodes.Ldloc, rpcSignature));
+                code.Append(Instruction.Create(OpCodes.Ldloc, currentDeltaPlayerTarget));
+                code.Append(Instruction.Create(OpCodes.Call, createPackerForRPC));
+                code.Append(Instruction.Create(OpCodes.Stloc, rpcPacker));
+            }
+
             if (returnMode != ReturnMode.Void)
             {
-                var serializeGenericMethod = CreateSerializer(module, module.TypeSystem.UInt32, true);
+                MethodReference serializeGenericMethod;
+
+                if (useDeltaPacking)
+                {
+                    serializeGenericMethod = CreateDeltaSerializer(module, module.TypeSystem.UInt32, rpcPacker, true);
+                    code.Append(Instruction.Create(OpCodes.Ldloca, rpcPacker));
+                }
+                else serializeGenericMethod = CreateSerializer(module, module.TypeSystem.UInt32, true);
 
                 code.Append(Instruction.Create(OpCodes.Ldloc, streamVariable));
                 code.Append(Instruction.Create(OpCodes.Ldloc, rpcRequest));
@@ -1536,7 +1902,14 @@ namespace PurrNet.Codegen
                 code.Append(Instruction.Create(OpCodes.Call, getStableHashU32Generic));
                 code.Append(Instruction.Create(OpCodes.Stloc, typeHash));
 
-                var serializeGenericMethod = CreateSerializer(module, module.TypeSystem.UInt32, true);
+                MethodReference serializeGenericMethod;
+
+                if (useDeltaPacking)
+                {
+                    serializeGenericMethod = CreateDeltaSerializer(module, module.TypeSystem.UInt32, rpcPacker, true);
+                    code.Append(Instruction.Create(OpCodes.Ldloca, rpcPacker));
+                }
+                else serializeGenericMethod = CreateSerializer(module, module.TypeSystem.UInt32, true);
 
                 code.Append(Instruction.Create(OpCodes.Ldloc, streamVariable));
                 code.Append(Instruction.Create(OpCodes.Ldloc, typeHash));
@@ -1562,52 +1935,19 @@ namespace PurrNet.Codegen
                 if (ShouldIgnore(methodRpc.Signature.type, param, i, paramCount, out _))
                     continue;
 
-                // if isGeneric, write the type hash
-                var serializeGenericMethod = CreateSerializer(module, param.ParameterType, true);
+                MethodReference serializeGenericMethod;
+
+                if (useDeltaPacking)
+                {
+                    serializeGenericMethod = CreateDeltaSerializer(module, param.ParameterType, rpcPacker, true);
+                    code.Append(Instruction.Create(OpCodes.Ldloca, rpcPacker));
+                }
+                else serializeGenericMethod = CreateSerializer(module, param.ParameterType, true);
 
                 code.Append(Instruction.Create(OpCodes.Ldloc, streamVariable));
                 code.Append(Instruction.Create(OpCodes.Ldarg, param));
                 code.Append(Instruction.Create(OpCodes.Call, serializeGenericMethod));
             }
-
-            if (methodRpc.Signature.isStatic)
-            {
-                var buildRawRPCMethod = rpcType.GetMethod("BuildStaticRawRPC", true).Import(module);
-                var genericInstanceMethod = new GenericInstanceMethod(buildRawRPCMethod);
-                genericInstanceMethod.GenericArguments.Add(method.DeclaringType);
-
-                // rpcId, stream
-                code.Append(Instruction.Create(OpCodes.Ldc_I4, id));
-                code.Append(Instruction.Create(OpCodes.Ldloc, streamVariable));
-
-                // BuildStaticRawRPC(int rpcId, NetworkStream stream)
-                code.Append(Instruction.Create(OpCodes.Call, genericInstanceMethod));
-            }
-            else if (isNetworkClass)
-            {
-                var buildChildRpc = module.GetTypeDefinition<NetworkModule>().GetMethod("BuildRPC").Import(module);
-
-                code.Append(Instruction.Create(OpCodes.Ldarg_0));
-                code.Append(Instruction.Create(OpCodes.Ldc_I4, id));
-                code.Append(Instruction.Create(OpCodes.Ldloc, streamVariable));
-                code.Append(Instruction.Create(OpCodes.Call, buildChildRpc));
-            }
-            else
-            {
-                var buildRawRPCMethod = rpcType.GetMethod("BuildRawRPC").Import(module);
-
-                code.Append(Instruction.Create(OpCodes.Ldarg_0));
-                code.Append(Instruction.Create(OpCodes.Call, getId.GetMethod.Import(module))); // id
-                code.Append(Instruction.Create(OpCodes.Ldarg_0));
-                code.Append(Instruction.Create(OpCodes.Call, getSceneId.GetMethod.Import(module))); // sceneId
-                code.Append(Instruction.Create(OpCodes.Ldc_I4, id)); // rpcId
-                code.Append(Instruction.Create(OpCodes.Ldloc, streamVariable)); // stream
-
-                // BuildRawRPC(int networkId, SceneID sceneId, byte rpcId, NetworkStream stream, RPCDetails details)
-                code.Append(Instruction.Create(OpCodes.Call, buildRawRPCMethod));
-            }
-
-            code.Append(Instruction.Create(OpCodes.Stloc, rpcDataVariable)); // rpcPacket
 
             // Call RPCModule.PreProcessRpc(RPCPacket packet, RPCSignature signature, ref BitPacker packer)
             var preProcessRpc = rpcType.GetMethod("PreProcessRpc").Import(module);
@@ -1644,6 +1984,25 @@ namespace PurrNet.Codegen
 
             code.Append(Instruction.Create(OpCodes.Ldloc, streamVariable));
             code.Append(Instruction.Create(OpCodes.Call, freeStreamMethod));
+
+            if (useDeltaPacking && hasMultipleTargets)
+            {
+                // i -= 1;
+                code.Append(Instruction.Create(OpCodes.Ldloc, iterator));
+                code.Append(Instruction.Create(OpCodes.Ldc_I4_1));
+                code.Append(Instruction.Create(OpCodes.Sub));
+                code.Append(Instruction.Create(OpCodes.Stloc, iterator));
+
+                // jump back up
+                code.Append(Instruction.Create(OpCodes.Br, playersLoopStart));
+                code.Append(playersLoopEnd);
+
+                var disposeConcret = playersListType.GetMethodRef("Dispose");
+
+                // playersList.Dispose();
+                code.Append(Instruction.Create(OpCodes.Ldloca, playersList));
+                code.Append(Instruction.Create(OpCodes.Call, disposeConcret.Import(module)));
+            }
 
             code.Append(Instruction.Create(OpCodes.Ldloc, rpcSignature));
             code.Append(Instruction.Create(OpCodes.Ldfld,
@@ -1753,6 +2112,50 @@ namespace PurrNet.Codegen
             return newMethod;
         }
 
+        private static void CreateAndSetPacket(ModuleDefinition module, int id, RPCMethod methodRpc, bool isNetworkClass,
+            TypeDefinition rpcType, MethodDefinition method, ILProcessor code, VariableDefinition streamVariable,
+            PropertyDefinition getId, PropertyDefinition getSceneId, VariableDefinition rpcDataVariable)
+        {
+            if (methodRpc.Signature.isStatic)
+            {
+                var buildRawRPCMethod = rpcType.GetMethod("BuildStaticRawRPC", true).Import(module);
+                var genericInstanceMethod = new GenericInstanceMethod(buildRawRPCMethod);
+                genericInstanceMethod.GenericArguments.Add(method.DeclaringType);
+
+                // rpcId, stream
+                code.Append(Instruction.Create(OpCodes.Ldc_I4, id));
+                code.Append(Instruction.Create(OpCodes.Ldloc, streamVariable));
+
+                // BuildStaticRawRPC(int rpcId, NetworkStream stream)
+                code.Append(Instruction.Create(OpCodes.Call, genericInstanceMethod));
+            }
+            else if (isNetworkClass)
+            {
+                var buildChildRpc = module.GetTypeDefinition<NetworkModule>().GetMethod("BuildRPC").Import(module);
+
+                code.Append(Instruction.Create(OpCodes.Ldarg_0));
+                code.Append(Instruction.Create(OpCodes.Ldc_I4, id));
+                code.Append(Instruction.Create(OpCodes.Ldloc, streamVariable));
+                code.Append(Instruction.Create(OpCodes.Call, buildChildRpc));
+            }
+            else
+            {
+                var buildRawRPCMethod = rpcType.GetMethod("BuildRawRPC").Import(module);
+
+                code.Append(Instruction.Create(OpCodes.Ldarg_0));
+                code.Append(Instruction.Create(OpCodes.Call, getId.GetMethod.Import(module))); // id
+                code.Append(Instruction.Create(OpCodes.Ldarg_0));
+                code.Append(Instruction.Create(OpCodes.Call, getSceneId.GetMethod.Import(module))); // sceneId
+                code.Append(Instruction.Create(OpCodes.Ldc_I4, id)); // rpcId
+                code.Append(Instruction.Create(OpCodes.Ldloc, streamVariable)); // stream
+
+                // BuildRawRPC(int networkId, SceneID sceneId, byte rpcId, NetworkStream stream, RPCDetails details)
+                code.Append(Instruction.Create(OpCodes.Call, buildRawRPCMethod));
+            }
+
+            code.Append(Instruction.Create(OpCodes.Stloc, rpcDataVariable)); // rpcPacket
+        }
+
         private static void PutIsServerOnStack(ModuleDefinition module, RPCMethod methodRpc, bool isNetworkClass,
             ILProcessor code, TypeDefinition moduleType, TypeDefinition identityType)
         {
@@ -1779,6 +2182,25 @@ namespace PurrNet.Codegen
                 var getIsServerOnly = identityType.GetProperty("isServer");
                 code.Append(Instruction.Create(OpCodes.Ldarg_0));
                 code.Append(Instruction.Create(OpCodes.Call, getIsServerOnly.GetMethod.Import(module)));
+            }
+        }
+
+        private static MethodReference CreateDeltaSerializer(ModuleDefinition module, TypeReference type, VariableDefinition packer, bool isWrite)
+        {
+            var method = packer.VariableType.GetMethod(isWrite ? "Write" : "Read", true).Import(module);
+
+            var genericMethod = new GenericInstanceMethod(method);
+            genericMethod.GenericArguments.Add(type);
+
+            try
+            {
+                return genericMethod.Import(module);
+            }
+            catch (Exception e)
+            {
+                throw new Exception(
+                    $"Failed to import method '{genericMethod.FullName}'. Module: {module.Name}, Target: {type.FullName}",
+                    e);
             }
         }
 
@@ -1868,6 +2290,7 @@ namespace PurrNet.Codegen
             code.Append(Instruction.Create(OpCodes.Ldc_R4, rpc.Signature.asyncTimeoutInSec));
             code.Append(Instruction.Create(OpCodes.Ldc_I4, (int)rpc.Signature.compressionLevel));
             code.Append(Instruction.Create(OpCodes.Ldc_I4, rpc.Signature.excludeSender ? 1 : 0));
+            code.Append(Instruction.Create(OpCodes.Ldc_I4, rpc.Signature.deltaPacked ? 1 : 0));
 
             if (rpc.Signature.type == RPCType.TargetRPC)
             {
@@ -1949,6 +2372,18 @@ namespace PurrNet.Codegen
             playdIdType.Import(module);
             var getNullableMethod = playdIdType.GetMethod("GetNullable").Import(module);
             code.Append(Instruction.Create(OpCodes.Call, getNullableMethod));
+        }
+
+        private static TypeReference GetParentType(ModuleDefinition module, bool isNetworkModule, bool isStatic)
+        {
+            if (!isStatic)
+            {
+                return isNetworkModule
+                    ? module.GetTypeDefinition<NetworkModule>().Import(module)
+                    : module.GetTypeDefinition<NetworkIdentity>().Import(module);
+            }
+
+            return module.GetTypeDefinition<RPCModule>().Import(module);
         }
 
         private static void PushLocalPlayerProp(ModuleDefinition module, ILProcessor code, bool isNetworkModule, bool isStatic)
@@ -2226,15 +2661,11 @@ namespace PurrNet.Codegen
                         }
 
                         UnityProxyProcessor.Process(types[t], messages);
-                        RegisterSerializersProcessor.HandleType(module, types[t], isEditor, typesToIgnoreForDelta,
+                        RegisterSerializersProcessor.HandleType(module, types[t], typesToIgnoreForDelta,
                             typesToIgnoreForSerialization);
 
                         var type = types[t];
 
-#if UNITY_PLAYMODE
-                        if (type.Name == "TopView" && type.Namespace == "Unity.Multiplayer.Playmode.Workflow.Editor")
-                            UnityPlaymodePatch.Patch(type);
-#endif
                         if (!hasPurrNetAsReference)
                             continue;
 
@@ -2262,7 +2693,11 @@ namespace PurrNet.Codegen
                         if (!type.IsClass)
                         {
                             for (var i = 0; i < type.Methods.Count; i++)
-                                ProcessServerOnlyMethods(type.Methods[i], settings, isServerBuild, isEditor);
+                            {
+                                var method = type.Methods[i];
+                                ProcessServerOnlyMethods(method, settings, isServerBuild, isEditor);
+                                ProcessRunContextGuardedMethods(method, settings, false);
+                            }
                             continue;
                         }
 
@@ -2302,7 +2737,8 @@ namespace PurrNet.Codegen
                             try
                             {
                                 var method = type.Methods[i];
-                                ProcessServerOnlyMethods(type.Methods[i], settings, isServerBuild, isEditor);
+                                ProcessServerOnlyMethods(method, settings, isServerBuild, isEditor);
+                                ProcessRunContextGuardedMethods(method, settings, inheritsFromNetworkIdentity);
 
                                 if (inheritsFromNetworkIdentity && MakeSureOverrideIsCalled.ShouldProcess(method))
                                     MakeSureOverrideIsCalled.Process(method, messages);
@@ -2545,6 +2981,136 @@ namespace PurrNet.Codegen
                 .GetMethod.Import(module);
             var getIsServer = Instruction.Create(OpCodes.Call, isServerOnlyProp);
             return getIsServer;
+        }
+
+        private static Instruction GetIsClientMethod(ModuleDefinition module)
+        {
+            var isClientProp = module.GetTypeDefinition<NetworkManager>()
+                .GetProperty("isClientStatic")
+                .GetMethod.Import(module);
+            var getIsClient = Instruction.Create(OpCodes.Call, isClientProp);
+            return getIsClient;
+        }
+
+        private static void ProcessRunContextGuardedMethods(MethodDefinition method, PurrNetSettings settings, bool inheritsFromNetworkIdentity)
+        {
+            if (method.Body == null) return;
+
+            bool hasServer = false;
+            bool hasClient = false;
+            bool hasOwner = false;
+
+            var guardFailureActionOverride = GuardFailureActionOverride.Settings;
+
+            foreach (var attribute in method.CustomAttributes)
+            {
+                string fullName = attribute.AttributeType.FullName;
+                if (!hasServer && fullName == typeof(ServerAttribute).FullName)
+                {
+                    hasServer = true;
+                }
+                else if (!hasClient && fullName == typeof(ClientAttribute).FullName)
+                {
+                    hasClient = true;
+                }
+                else if (!hasOwner && fullName == typeof(OwnerAttribute).FullName)
+                {
+                    hasOwner = true;
+                }
+                else if (fullName == typeof(GuardFailureActionAttribute).FullName)
+                {
+                    guardFailureActionOverride = (GuardFailureActionOverride)attribute.ConstructorArguments[0].Value;
+                }
+            }
+
+            if (!hasServer && !hasClient && !hasOwner)
+                return;
+
+            var guardFailureAction = GetMode(settings, guardFailureActionOverride);
+            if (guardFailureAction == GuardFailureAction.Ignore) return;
+
+            // insert guard
+            var il = method.Body.GetILProcessor();
+            var firstInstruction = method.Body.Instructions[0];
+            var module = method.Module;
+
+            var failureHandler = CreateGuardFailureActionHandler(method, il, guardFailureAction);
+
+            if (hasServer)
+            {
+                var callIsServer = GetIsServerMethod(module);
+                il.InsertBefore(firstInstruction, callIsServer);
+                il.InsertAfter(callIsServer, il.Create(OpCodes.Brtrue, firstInstruction));
+            }
+
+            if (hasClient)
+            {
+                var callIsClient = GetIsClientMethod(module);
+                il.InsertBefore(firstInstruction, callIsClient);
+                il.InsertAfter(callIsClient, il.Create(OpCodes.Brtrue, firstInstruction));
+            }
+
+            if (hasOwner)
+            {
+                if (!inheritsFromNetworkIdentity)
+                    throw new InvalidOperationException($"[Owner] requires {method.DeclaringType.Name} to inherit NetworkIdentity.");
+
+                CheckNetworkIdentityProperty("isOwner", module, il, firstInstruction);
+            }
+
+            il.InsertBefore(firstInstruction, il.Create(OpCodes.Br, failureHandler));
+        }
+
+        private static Instruction CreateGuardFailureActionHandler(
+            MethodDefinition method,
+            ILProcessor il,
+            GuardFailureAction action)
+        {
+            var handler = il.Create(OpCodes.Nop);
+            il.Append(handler);
+
+            switch (action)
+            {
+                case GuardFailureAction.ReturnDefault:
+                    break;
+                case GuardFailureAction.ThrowException:
+                    var throwExcep = method.Module.GetTypeDefinition(typeof(PurrLogger))
+                        .GetMethod("ThrowUnsupportedException", false).Import(method.Module);
+                    il.Append(il.Create(OpCodes.Ldstr, $"Method '{method.DeclaringType.Name}.{method.Name}' cannot be called from this context."));
+                    il.Append(il.Create(OpCodes.Call, throwExcep));
+                    break;
+                case GuardFailureAction.LogWarning:
+                    var logWarningMethod = method.Module.GetTypeDefinition(typeof(PurrLogger))
+                        .GetMethod("LogSimplerWarning", false).Import(method.Module);
+                    il.Append(il.Create(OpCodes.Ldstr, $"Method '{method.DeclaringType.Name}.{method.Name}' cannot be called from this context."));
+                    il.Append(il.Create(OpCodes.Call, logWarningMethod));
+                    break;
+                case GuardFailureAction.LogError:
+                    var logErrorMethod = method.Module.GetTypeDefinition(typeof(PurrLogger))
+                        .GetMethod("LogSimplerError", false).Import(method.Module);
+                    il.Append(il.Create(OpCodes.Ldstr, $"Method '{method.DeclaringType.Name}.{method.Name}' cannot be called from this context."));
+                    il.Append(il.Create(OpCodes.Call, logErrorMethod));
+                    break;
+                default:
+                    throw new ArgumentOutOfRangeException();
+            }
+
+            ProperlyEndMethod(method, il);
+
+            return handler;
+        }
+
+        private static void CheckNetworkIdentityProperty(string property, ModuleDefinition module, ILProcessor il, Instruction target)
+        {
+            var networkIdentityType = module.GetTypeDefinition<NetworkIdentity>().Resolve();
+            var isOwnerGetter = networkIdentityType
+                .GetProperty(property)
+                .GetMethod.Import(module);
+
+            var ldarg0 = il.Create(OpCodes.Ldarg_0);
+            il.InsertBefore(target, ldarg0);
+            il.InsertAfter(ldarg0, il.Create(OpCodes.Callvirt, isOwnerGetter));
+            il.InsertAfter(ldarg0.Next, il.Create(OpCodes.Brtrue, target));
         }
 
         private static void IncludeAnyConcreteGenericParameters(TypeDefinition type,
@@ -3007,6 +3573,9 @@ namespace PurrNet.Codegen
                 return true;
 
             if (IsGeneric(typeReference, typeof(DisposableList<>)))
+                return true;
+
+            if (IsGeneric(typeReference, typeof(DisposableArray<>)))
                 return true;
 
             if (IsGeneric(typeReference, typeof(DisposableHashSet<>)))

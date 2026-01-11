@@ -30,7 +30,7 @@ namespace PurrNet.Modules
 
     public struct RpcResponse
     {
-        public uint id;
+        public PackedUInt id;
         public ByteData data;
     }
 
@@ -396,6 +396,150 @@ namespace PurrNet.Modules
                     {
                         id = reqId,
                         data = ByteData.empty
+                    };
+
+                    var channel = info.compileTimeSignature.channel;
+
+                    if (info.asServer)
+                        rpcModule._playersManager.Send(info.sender, responsePacket, channel);
+                    else rpcModule._playersManager.SendToServer(responsePacket, channel);
+                }
+                else
+                {
+                    PurrLogger.LogError("Failed to get module, response won't be sent and receiver will timeout.");
+                }
+            }
+            catch (Exception ex)
+            {
+                PurrLogger.LogError($"Error while processing RPC response: {ex.Message}\n{ex.StackTrace}");
+            }
+        }
+
+        public static Type GetTaskResultType(object maybeTask)
+        {
+            if (maybeTask == null)
+                return null;
+
+            var type = maybeTask.GetType();
+
+            // Handle generic like Task<T>, UniTask<T>
+            if (type.IsGenericType)
+                return type.GetGenericArguments()[0];
+
+            // Non-generic Task/UniTask (void)
+            return null;
+        }
+
+        static async Task<object> AwaitAnyTaskAsync(object maybeTask)
+        {
+            if (maybeTask == null)
+                return null;
+
+            var type = maybeTask.GetType();
+            var getAwaiter = type.GetMethod("GetAwaiter");
+            if (getAwaiter == null)
+                return null;
+
+            var awaiter = getAwaiter.Invoke(maybeTask, null);
+            if (awaiter == null)
+                return null;
+
+            var isCompletedProp = awaiter.GetType().GetProperty("IsCompleted");
+            var isCompleted = (bool)(isCompletedProp?.GetValue(awaiter) ?? false);
+
+            var getResult = awaiter.GetType().GetMethod("GetResult");
+            var onCompleted = awaiter.GetType().GetMethod("OnCompleted");
+
+            if (!isCompleted)
+            {
+                var tcs = new TaskCompletionSource<bool>();
+                onCompleted?.Invoke(awaiter, new object[]
+                {
+                    (Action)(() => tcs.TrySetResult(true))
+                });
+                await tcs.Task;
+            }
+
+            // This will throw if the awaited task failed — which is what we want
+            return getResult?.Invoke(awaiter, null);
+        }
+
+        [UsedByIL]
+        public static void CompleteRequestWithResponseObject(object task, RPCInfo info, uint reqId, NetworkManager manager)
+        {
+            CompleteRequestWithResponse(task, info, reqId, manager);
+        }
+
+        [UsedByIL]
+        public static async void CompleteRequestWithResponse(object task, RPCInfo info, uint reqId, NetworkManager manager)
+        {
+            try
+            {
+                var taskResultType = GetTaskResultType(task);
+                object result = await AwaitAnyTaskAsync(task);
+
+                var t = task.GetType();
+                if (t.IsGenericType)
+                {
+                    var resultProp = t.GetProperty("Result");
+                    result = resultProp?.GetValue(task);
+                }
+
+                if (manager.TryGetModule<RpcRequestResponseModule>(info.asServer, out var rpcModule))
+                {
+                    using var tmpStream = RPCModule.AllocStream(false);
+
+                    Packer.Write(tmpStream, taskResultType, result);
+
+                    // rpcModule
+                    var responsePacket = new RpcResponse
+                    {
+                        id = reqId,
+                        data = tmpStream.ToByteData()
+                    };
+
+                    var channel = info.compileTimeSignature.channel;
+
+                    if (info.asServer)
+                        rpcModule._playersManager.Send(info.sender, responsePacket, channel);
+                    else rpcModule._playersManager.SendToServer(responsePacket, channel);
+                }
+                else
+                {
+                    PurrLogger.LogError("Failed to get module, response won't be sent and receiver will timeout.");
+                }
+            }
+            catch (Exception ex)
+            {
+                PurrLogger.LogError($"Error while processing RPC response: {ex.Message}\n{ex.StackTrace}");
+            }
+        }
+
+        [UsedByIL]
+        public static void CompleteRequestWithUniTaskObject(object task, RPCInfo info, uint reqId, NetworkManager manager)
+        {
+            CompleteRequestWithUniTask(task, info, reqId, manager);
+        }
+
+        [UsedByIL]
+        public static async void CompleteRequestWithUniTask(object task, RPCInfo info, uint reqId, NetworkManager manager)
+        {
+            try
+            {
+                var taskResultType = GetTaskResultType(task);
+                object result = await AwaitAnyTaskAsync(task);
+
+                if (manager.TryGetModule<RpcRequestResponseModule>(info.asServer, out var rpcModule))
+                {
+                    using var tmpStream = RPCModule.AllocStream(false);
+
+                    Packer.Write(tmpStream, taskResultType, result);
+
+                    // rpcModule
+                    var responsePacket = new RpcResponse
+                    {
+                        id = reqId,
+                        data = tmpStream.ToByteData()
                     };
 
                     var channel = info.compileTimeSignature.channel;

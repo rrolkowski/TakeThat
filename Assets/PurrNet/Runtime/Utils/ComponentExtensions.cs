@@ -1,6 +1,5 @@
 using UnityEngine;
-#if !UNITY_2022_3_OR_NEWER
-using System.Reflection;
+#if !UNITY_6000_0_OR_NEWER
 using PurrNet.Pooling;
 #endif
 
@@ -8,19 +7,20 @@ public static class ComponentExtensions
 {
     #region Animator
 
-#if !UNITY_2022_3_OR_NEWER
+#if !UNITY_2022_2_OR_NEWER
 
-    private static readonly FieldInfo _avatarRootField;
+    private static readonly System.Reflection.FieldInfo _avatarRootField;
 
     static ComponentExtensions()
     {
-        _avatarRootField = typeof(Animator).GetField("avatarRoot", BindingFlags.NonPublic | BindingFlags.Instance);
+        _avatarRootField = typeof(Animator).GetField("avatarRoot",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
     }
 #endif
 
     public static Transform GetAvatarRoot(this Animator animator)
     {
-#if !UNITY_2022_3_OR_NEWER
+#if !UNITY_2022_2_OR_NEWER
         if (animator == null || _avatarRootField == null)
             return null;
         return _avatarRootField.GetValue(animator) as Transform;
@@ -31,7 +31,7 @@ public static class ComponentExtensions
 
     #endregion
 
-#if !UNITY_2022_3_OR_NEWER
+#if !UNITY_6000_0_OR_NEWER
     public static int GetComponentIndex(this Component component)
     {
         if (!component)

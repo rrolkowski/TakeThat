@@ -42,12 +42,19 @@ namespace PurrNet.Editor
 
             GUILayout.Space(10f);
 
-            var result = EditorGUILayout.EnumPopup(
+            var stripCodeModeResult = EditorGUILayout.EnumPopup(
                 new GUIContent("Strip Code Mode",
                     "Defines how PurrNet will handle unused RPCs and SyncVars in builds. " +
                     "This can help reduce build size and improve performance."),
                 settings.stripCodeMode);
-            settings.stripCodeMode = (StripCodeMode)result;
+            settings.stripCodeMode = (StripCodeMode)stripCodeModeResult;
+
+            var guardFailureActionResult = EditorGUILayout.EnumPopup(
+                new GUIContent("Guard Failure Action",
+                    "Defines how PurrNet will handle run context guarded methods. " +
+                    "This can help organize your code."),
+                settings.guardFailureAction);
+            settings.guardFailureAction = (GuardFailureAction)guardFailureActionResult;
 
             if (EditorGUI.EndChangeCheck())
                 PurrNetSettings.SaveSettings(settings);

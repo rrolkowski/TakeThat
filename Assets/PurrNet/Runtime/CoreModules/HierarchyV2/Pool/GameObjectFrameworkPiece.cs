@@ -1,18 +1,42 @@
 ﻿using System.Text;
+using PurrNet.Packing;
+using UnityEngine;
 
 namespace PurrNet.Modules
 {
+    public readonly struct LocalTransform
+    {
+        public readonly CompressedVector3 localPosition;
+        public readonly PackedQuaternion localRotation;
+        public readonly CompressedVector3 localScale;
+
+        public LocalTransform(Vector3 position, Quaternion rotation, Vector3 localScale)
+        {
+            localPosition = position;
+            localRotation = rotation;
+            this.localScale = localScale;
+        }
+
+        public void Apply(Transform trs)
+        {
+            HierarchyV2.SetLocalPosAndRot(trs, localPosition, localRotation, localScale);
+        }
+    }
+
     public readonly struct GameObjectFrameworkPiece
     {
         public readonly PrefabPieceID pid;
         public readonly NetworkID id;
-        public readonly int childCount;
+        public readonly Size childCount;
         public readonly bool isActive;
         public readonly int[] inversedRelativePath;
 
-        public GameObjectFrameworkPiece(PrefabPieceID pid, NetworkID id, int childCount, bool isActive,
+        public readonly LocalTransform localTransform;
+
+        public GameObjectFrameworkPiece(LocalTransform trs, PrefabPieceID pid, NetworkID id, int childCount, bool isActive,
             int[] path)
         {
+            this.localTransform  = trs;
             this.pid = pid;
             this.id = id;
             this.childCount = childCount;

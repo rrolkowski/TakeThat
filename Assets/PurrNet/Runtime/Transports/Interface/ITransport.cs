@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using PurrNet.Packing;
 
 namespace PurrNet.Transports
 {
@@ -23,7 +24,7 @@ namespace PurrNet.Transports
     }
 
     [Serializable]
-    public readonly struct ByteData : IEquatable<ByteData>
+    public readonly struct ByteData : IEquatable<ByteData>, IDuplicate<ByteData>
     {
         public readonly byte[] data;
         public readonly int length;
@@ -47,6 +48,13 @@ namespace PurrNet.Transports
             this.data = data;
             this.offset = offset;
             this.length = length;
+        }
+
+        public ByteData Duplicate()
+        {
+            var newData = new byte[length];
+            Array.Copy(data, newData, length);
+            return new ByteData(newData);
         }
 
         public override bool Equals(object obj)
@@ -147,6 +155,21 @@ namespace PurrNet.Transports
         event OnConnectionState onConnectionState;
 
         public IReadOnlyList<Connection> connections { get; }
+
+        bool SupportsChannel(Channel channel)
+        {
+            return true;
+        }
+
+        int GetMTU(Connection target, Channel channel, bool asServer)
+        {
+            return channel switch
+            {
+                Channel.Unreliable or Channel.UnreliableSequenced or Channel.ReliableUnordered => 1024,
+                Channel.ReliableOrdered => 8192,
+                _ => throw new ArgumentOutOfRangeException(nameof(channel), channel, null)
+            };
+        }
 
         bool shouldServerSendKeepAlive => false;
 

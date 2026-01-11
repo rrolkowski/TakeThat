@@ -21,7 +21,8 @@ namespace PurrNet
             bool requireOwnership = true,
             CompressionLevel compressionLevel = CompressionLevel.None,
             float asyncTimeoutInSec = 5f,
-            StripCodeModeOverride stripCode = StripCodeModeOverride.Settings)
+            StripCodeModeOverride stripCode = StripCodeModeOverride.Settings,
+            bool deltaPacked = false)
         {
         }
     }

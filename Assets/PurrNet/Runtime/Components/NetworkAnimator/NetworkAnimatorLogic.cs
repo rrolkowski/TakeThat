@@ -2,12 +2,13 @@
 using System;
 using System.Collections.Generic;
 using JetBrains.Annotations;
+using PurrNet.Pooling;
 
 namespace PurrNet
 {
     public sealed partial class NetworkAnimator : ITick
     {
-        readonly List<NetAnimatorRPC> _dirty = new List<NetAnimatorRPC>();
+        private DisposableList<NetAnimatorRPC> _dirty = DisposableList<NetAnimatorRPC>.Create();
         readonly List<NetAnimatorRPC> _ikActions = new List<NetAnimatorRPC>();
 
         readonly List<PlayerID> _reconcilePlayers = new List<PlayerID>();
@@ -41,7 +42,7 @@ namespace PurrNet
             if (!IsController(_ownerAuth))
                 return;
 
-            var data = NetAnimatorActionBatch.CreateReconcile(_dontSyncHashes, _animator, isIk);
+            using var data = NetAnimatorActionBatch.CreateReconcile(_dontSyncHashes, _animator, isIk);
 
             if (isServer)
             {
@@ -65,7 +66,7 @@ namespace PurrNet
             if (!IsController(_ownerAuth))
                 return;
 
-            var data = NetAnimatorActionBatch.CreateReconcile(_dontSyncHashes, _animator, isIk);
+            using var data = NetAnimatorActionBatch.CreateReconcile(_dontSyncHashes, _animator, isIk);
 
             if (isServer)
             {
@@ -74,6 +75,23 @@ namespace PurrNet
             else
             {
                 ForwardThroughServerToTarget(target, data);
+            }
+        }
+
+        public void ReconcileAnimationTime()
+        {
+            if (!IsController(_ownerAuth))
+                return;
+
+            using var data = NetAnimatorActionBatch.CreateTimeReconcile(_dontSyncHashes, _animator);
+
+            if (isServer)
+            {
+                ApplyActionsOnObservers(data);
+            }
+            else
+            {
+                ForwardThroughServer(data);
             }
         }
 
@@ -99,10 +117,10 @@ namespace PurrNet
                             => a._float.nameHash == b._float.nameHash);
                         break;
                     }
-                    case NetAnimatorAction.SetInt:
+                    case NetAnimatorAction.SetInteger:
                     {
                         RemovePast(i, action, (a, b)
-                            => a._int.nameHash == b._int.nameHash);
+                            => a._integer.nameHash == b._integer.nameHash);
                         break;
                     }
                     case NetAnimatorAction.SetTrigger:
@@ -177,36 +195,48 @@ namespace PurrNet
         [TargetRpc(compressionLevel: CompressionLevel.Best)]
         private void ReconcileState([UsedImplicitly] PlayerID player, NetAnimatorActionBatch actions)
         {
-            if (IsController(_ownerAuth))
-                return;
+            using (actions)
+            {
+                if (IsController(_ownerAuth))
+                    return;
 
-            ExecuteBatch(actions);
+                ExecuteBatch(actions);
+            }
         }
 
         [ServerRpc(compressionLevel: CompressionLevel.Best)]
         private void ForwardThroughServerToTarget(PlayerID target, NetAnimatorActionBatch actions)
         {
-            if (_ownerAuth)
-                ReconcileState(target, actions);
+            using (actions)
+            {
+                if (_ownerAuth)
+                    ReconcileState(target, actions);
+            }
         }
 
         [ServerRpc(compressionLevel: CompressionLevel.Best)]
         private void ForwardThroughServer(NetAnimatorActionBatch actions)
         {
-            if (_ownerAuth)
+            using (actions)
             {
-                ExecuteBatch(actions);
-                ApplyActionsOnObservers(actions);
+                if (_ownerAuth)
+                {
+                    ExecuteBatch(actions);
+                    ApplyActionsOnObservers(actions);
+                }
             }
         }
 
         [ObserversRpc(excludeSender: true, compressionLevel: CompressionLevel.Best)]
         private void ApplyActionsOnObservers(NetAnimatorActionBatch actions)
         {
-            if (IsController(_ownerAuth))
-                return;
+            using (actions)
+            {
+                if (IsController(_ownerAuth))
+                    return;
 
-            ExecuteBatch(actions);
+                ExecuteBatch(actions);
+            }
         }
 
         private void ExecuteBatch(NetAnimatorActionBatch actions)
@@ -214,7 +244,7 @@ namespace PurrNet
             if (!_animator)
                 return;
 
-            if (actions.actions == null)
+            if (actions.actions.list == null)
                 return;
 
             for (var i = 0; i < actions.actions.Count; i++)

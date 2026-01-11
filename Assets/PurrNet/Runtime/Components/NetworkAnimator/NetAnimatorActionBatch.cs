@@ -1,17 +1,34 @@
 ﻿#if UNITY_ANIMATION
+using System;
 using System.Collections.Generic;
 using PurrNet.Packing;
+using PurrNet.Pooling;
 using UnityEngine;
 
 namespace PurrNet
 {
-    internal struct NetAnimatorActionBatch : IPackedAuto
+    internal struct NetAnimatorActionBatch : IPackedAuto, IDisposable
     {
-        public List<NetAnimatorRPC> actions;
+        public DisposableList<NetAnimatorRPC> actions;
+
+        public void Dispose()
+        {
+            actions.Dispose();
+        }
+
+        public static NetAnimatorActionBatch CreateTimeReconcile(HashSet<int> ignoreHashes, Animator animator)
+        {
+            var actions = DisposableList<NetAnimatorRPC>.Create();
+            SyncParameters(ignoreHashes, animator, actions);
+            return new NetAnimatorActionBatch
+            {
+                actions = actions
+            };
+        }
 
         public static NetAnimatorActionBatch CreateReconcile(HashSet<int> ignoreHashes, Animator animator, bool ik)
         {
-            var actions = new List<NetAnimatorRPC>();
+            var actions = DisposableList<NetAnimatorRPC>.Create();
 
             if (ik)
             {
@@ -57,7 +74,7 @@ namespace PurrNet
             };
         }
 
-        private static void SyncIK(AvatarIKGoal goal, Animator animator, List<NetAnimatorRPC> actions)
+        private static void SyncIK(AvatarIKGoal goal, Animator animator, DisposableList<NetAnimatorRPC> actions)
         {
             if (animator.GetIKPositionWeight(goal) > 0)
             {
@@ -96,7 +113,7 @@ namespace PurrNet
             }
         }
 
-        private static void SyncIKHint(AvatarIKHint hint, Animator animator, List<NetAnimatorRPC> actions)
+        private static void SyncIKHint(AvatarIKHint hint, Animator animator, DisposableList<NetAnimatorRPC> actions)
         {
             if (animator.GetIKHintPositionWeight(hint) > 0)
             {
@@ -117,7 +134,7 @@ namespace PurrNet
             }
         }
 
-        private static void SyncAnimationState(Animator animator, List<NetAnimatorRPC> actions)
+        private static void SyncAnimationState(Animator animator, DisposableList<NetAnimatorRPC> actions)
         {
             if (!animator.runtimeAnimatorController)
                 return;
@@ -134,7 +151,7 @@ namespace PurrNet
             }
         }
 
-        private static void SyncParameters(HashSet<int> ignoreHashes, Animator animator, List<NetAnimatorRPC> actions)
+        private static void SyncParameters(HashSet<int> ignoreHashes, Animator animator, DisposableList<NetAnimatorRPC> actions)
         {
             if (!animator.runtimeAnimatorController)
                 return;
@@ -174,13 +191,13 @@ namespace PurrNet
                     }
                     case AnimatorControllerParameterType.Int:
                     {
-                        var setInt = new SetInt
+                        var setInteger = new SetInteger
                         {
                             value = animator.GetInteger(param.name),
                             nameHash = param.nameHash
                         };
 
-                        actions.Add(new NetAnimatorRPC(setInt));
+                        actions.Add(new NetAnimatorRPC(setInteger));
                         break;
                     }
                 }

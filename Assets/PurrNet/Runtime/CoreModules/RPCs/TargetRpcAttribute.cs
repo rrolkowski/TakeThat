@@ -13,7 +13,8 @@ namespace PurrNet
             bool bufferLast = false,
             bool requireServer = true,
             CompressionLevel compressionLevel = CompressionLevel.None,
-            float asyncTimeoutInSec = 5f)
+            float asyncTimeoutInSec = 5f,
+            bool deltaPacked = false)
         {
         }
     }
