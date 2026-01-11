@@ -25,6 +25,7 @@ public class HandFan : MonoBehaviour
             float rad = deg * Mathf.Deg2Rad;
 
             var pos = new Vector3(Mathf.Sin(rad) * radius, Mathf.Cos(rad) * radius, 0f);
+            pos.z = -0.001f * i;
             var rot = Quaternion.Euler(0f, 0f, -deg);
 
             var c = Instantiate(cardPrefab, root);
@@ -32,6 +33,9 @@ public class HandFan : MonoBehaviour
             c.transform.localRotation = rot;
 
             c.Init(hand[i], spriteProvider(hand[i]));
+            var sr = c.GetComponent<SpriteRenderer>();
+            if (sr != null)
+                sr.sortingOrder = i;
             spawned.Add(c);
         }
     }

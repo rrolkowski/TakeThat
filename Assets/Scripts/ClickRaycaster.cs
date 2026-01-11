@@ -11,15 +11,22 @@ public class ClickRaycaster : MonoBehaviour
         if (Mouse.current == null) return;
         if (!Mouse.current.leftButton.wasPressedThisFrame) return;
 
-        Vector2 screenPos = Mouse.current.position.ReadValue();
-        Ray ray = cam.ScreenPointToRay(screenPos);
+        var ray = cam.ScreenPointToRay(Mouse.current.position.ReadValue());
+        var hits = Physics.RaycastAll(ray, 1000f, clickableLayers);
 
-        if (Physics.Raycast(ray, out RaycastHit hit, 1000f, clickableLayers))
+        if (hits.Length == 0) return;
+
+        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+
+        for (int i = 0; i < hits.Length; i++)
         {
-            if (hit.collider.TryGetComponent<CardView>(out var card))
+            var card = hits[i].collider.GetComponentInParent<CardView>();
+            if (card != null)
             {
                 card.OnClicked();
+                break;
             }
         }
+
     }
 }

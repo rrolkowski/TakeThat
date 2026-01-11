@@ -152,6 +152,9 @@ public class GameSession : NetworkBehaviour
 
         Debug.Log($"[Public] Top Card: {topCard.suit} {topCard.value} | Turn: {currentTurn} | Dir: {direction}");
 
+        if (PlayerAvatar.allPlayers.TryGetValue(currentTurn, out var avatar))
+            TurnIndicator.Instance?.SetTarget(avatar.transform);
+
         // Etap 6: tu podepniesz przeciwników:
         // playerIds[i] ma counts[i] kart
     }
