@@ -17,7 +17,6 @@ public class OpponentHandsView : MonoBehaviour
 
     [Header("Prefabs")]
     [SerializeField] private GameObject backCardPrefab;
-    [SerializeField] private TMP_Text countTextPrefab;
 
     [Header("Fan Visual")]
     [SerializeField] private int maxBackCards = 10;
@@ -107,18 +106,6 @@ public class OpponentHandsView : MonoBehaviour
         }
 
         spawnedBacks[pid] = list;
-
-        var txt = spawnedTexts.TryGetValue(pid, out var existing) ? existing : null;
-        if (txt == null)
-        {
-            txt = Instantiate(countTextPrefab, anchor);
-            spawnedTexts[pid] = txt;
-        }
-
-        txt.transform.localPosition = fanOffset + new Vector3(0f, -0.2f, 0f);
-        txt.transform.localRotation = Quaternion.identity;
-        txt.text = count.ToString();
-        txt.gameObject.SetActive(true);
     }
 
     private int FindNearestSeatIndex(Vector3 p)

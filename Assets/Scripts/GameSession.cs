@@ -158,6 +158,8 @@ public class GameSession : NetworkBehaviour
             TurnIndicator.Instance?.SetTarget(avatar.transform);
 
         OpponentHandsView.Instance?.SetCounts(playerIds, counts);
+        OpponentBadgesView.Instance?.SetPlayers(playerIds, counts);
+
 
         // Etap 6: tu podepniesz przeciwników:
         // playerIds[i] ma counts[i] kart
