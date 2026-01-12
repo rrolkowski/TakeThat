@@ -26,7 +26,12 @@ public class ClickRaycaster : MonoBehaviour
                 card.OnClicked();
                 break;
             }
+            var pile = hits[i].collider.GetComponentInParent<DrawPileView>();
+            if (pile != null)
+            { 
+                pile.OnClicked();
+                break;
+            }
         }
-
     }
 }

@@ -147,6 +147,8 @@ public class GameSession : NetworkBehaviour
     )
     {
         topCard = newTopCard;
+        TopCardView.Instance?.SetCard(topCard);
+
         currentTurn = newCurrentTurn;
         direction = newDirection;
 
@@ -154,6 +156,8 @@ public class GameSession : NetworkBehaviour
 
         if (PlayerAvatar.allPlayers.TryGetValue(currentTurn, out var avatar))
             TurnIndicator.Instance?.SetTarget(avatar.transform);
+
+        OpponentHandsView.Instance?.SetCounts(playerIds, counts);
 
         // Etap 6: tu podepniesz przeciwników:
         // playerIds[i] ma counts[i] kart
@@ -164,6 +168,60 @@ public class GameSession : NetworkBehaviour
     {
         LocalHandView.Instance?.SetHand(hand);
     }
+
+    // =========================
+    // DOBIERANIE
+    // =========================
+
+    [ServerRpc(requireOwnership: false)]
+    public void Server_RequestDraw(RPCInfo info = default)
+    {
+        if (!started) return;
+
+        var pid = info.sender;
+
+        // tylko gracz z tur¹ mo¿e dobieraæ
+        if (pid != currentTurn) return;
+
+        if (!hands.TryGetValue(pid, out var hand)) return;
+
+        // dobierz 1
+        var card = Server_DrawCard();
+        hand.Add(card);
+
+        // koñczysz turê
+        Server_AdvanceTurn(steps: 1);
+
+        // update (publiczny + prywatny)
+        Server_RecalcHandCounts();
+        Server_BroadcastPublicState();
+        Target_SetHand(pid, hand.ToArray());
+    }
+
+    private CardId Server_DrawCard()
+    {
+        if (drawPile.Count == 0)
+        {
+            // reshuffle: zostaw top discard, resztê przetasuj do drawPile
+            if (discardPile.Count <= 1)
+            {
+                // brak kart – prototypowo oddaj dummy
+                return new CardId { suit = Suit.Green, value = 2 };
+            }
+
+            var top = discardPile.Pop();
+            var temp = discardPile.ToList();
+            discardPile.Clear();
+            discardPile.Push(top);
+
+            Shuffle(temp);
+            for (int i = 0; i < temp.Count; i++)
+                drawPile.Push(temp[i]);
+        }
+
+        return drawPile.Pop();
+    }
+
 
     // =========================
     // TURN HELPERS
