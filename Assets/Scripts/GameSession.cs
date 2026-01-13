@@ -11,12 +11,10 @@ public class GameSession : NetworkBehaviour
     [SerializeField] private int initialHandSize = 7;
     [SerializeField] private int copiesPerCard = 4;
 
-    // Publiczny stan
     private CardId topCard;
     private PlayerID currentTurn;
-    private int direction = 1; // na razie zawsze 1; reverse póŸniej
+    private int direction = 1;
 
-    // Serwer: stan gry
     private readonly Dictionary<PlayerID, List<CardId>> hands = new();
     private readonly Stack<CardId> drawPile = new();
     private readonly Stack<CardId> discardPile = new();
@@ -30,12 +28,13 @@ public class GameSession : NetworkBehaviour
     private void Awake()
     {
         Instance = this;
+        Debug.Log($"[GameSession] Awake. isServer={(NetworkManager.main != null && NetworkManager.main.isServer)}");
+
     }
 
     protected override void OnSpawned(bool asServer)
     {
         Debug.Log($"[GameSession] OnSpawned asServer={asServer}");
-        // start z lobby: Server_StartGame()
     }
 
     [ServerRpc(requireOwnership: false)]
@@ -70,10 +69,6 @@ public class GameSession : NetworkBehaviour
             Target_SetHand(pid, hands[pid].ToArray());
     }
 
-    // =========================
-    // ETAP 4: GRACIE KARTY
-    // =========================
-
     [ServerRpc(requireOwnership: false)]
     public void Server_RequestPlay(CardId card, RPCInfo info = default)
     {
@@ -81,32 +76,25 @@ public class GameSession : NetworkBehaviour
 
         var pid = info.sender;
 
-        // 1) czyja tura
         if (pid != currentTurn) return;
 
-        // 2) czy karta jest w rêce
         if (!hands.TryGetValue(pid, out var hand)) return;
 
         int idx = hand.FindIndex(c => c.suit == card.suit && c.value == card.value);
         if (idx < 0) return;
 
-        // 3) czy pasuje do top
         if (!IsPlayable(card, topCard)) return;
 
-        // OK -> wykonaj ruch
         hand.RemoveAt(idx);
 
         topCard = card;
         discardPile.Push(card);
 
-        // prze³¹cz turê
         Server_AdvanceTurn(steps: 1);
 
-        // update
         Server_RecalcHandCounts();
         Server_BroadcastPublicState();
 
-        // prywatna rêka tylko dla gracza, który zagra³
         Target_SetHand(pid, hand.ToArray());
     }
 
@@ -114,10 +102,6 @@ public class GameSession : NetworkBehaviour
     {
         return card.suit == top.suit || card.value == top.value;
     }
-
-    // =========================
-    // PUBLICZNY UPDATE (Etap 4-6)
-    // =========================
 
     private void Server_RecalcHandCounts()
     {
@@ -160,9 +144,6 @@ public class GameSession : NetworkBehaviour
         OpponentHandsView.Instance?.SetCounts(playerIds, counts);
         OpponentBadgesView.Instance?.SetPlayers(playerIds, counts);
 
-
-        // Etap 6: tu podepniesz przeciwników:
-        // playerIds[i] ma counts[i] kart
     }
 
     [TargetRpc]
@@ -171,9 +152,6 @@ public class GameSession : NetworkBehaviour
         LocalHandView.Instance?.SetHand(hand);
     }
 
-    // =========================
-    // DOBIERANIE
-    // =========================
 
     [ServerRpc(requireOwnership: false)]
     public void Server_RequestDraw(RPCInfo info = default)
@@ -182,19 +160,15 @@ public class GameSession : NetworkBehaviour
 
         var pid = info.sender;
 
-        // tylko gracz z tur¹ mo¿e dobieraæ
         if (pid != currentTurn) return;
 
         if (!hands.TryGetValue(pid, out var hand)) return;
 
-        // dobierz 1
         var card = Server_DrawCard();
         hand.Add(card);
 
-        // koñczysz turê
         Server_AdvanceTurn(steps: 1);
 
-        // update (publiczny + prywatny)
         Server_RecalcHandCounts();
         Server_BroadcastPublicState();
         Target_SetHand(pid, hand.ToArray());
@@ -204,10 +178,8 @@ public class GameSession : NetworkBehaviour
     {
         if (drawPile.Count == 0)
         {
-            // reshuffle: zostaw top discard, resztê przetasuj do drawPile
             if (discardPile.Count <= 1)
             {
-                // brak kart – prototypowo oddaj dummy
                 return new CardId { suit = Suit.Green, value = 2 };
             }
 
@@ -223,11 +195,6 @@ public class GameSession : NetworkBehaviour
 
         return drawPile.Pop();
     }
-
-
-    // =========================
-    // TURN HELPERS
-    // =========================
 
     private PlayerID GetCurrentTurn()
     {
@@ -253,10 +220,6 @@ public class GameSession : NetworkBehaviour
 
         currentTurn = GetCurrentTurn();
     }
-
-    // =========================
-    // DECK / DEAL
-    // =========================
 
     private void Server_BuildDeck(int copiesPerCardLocal)
     {

@@ -4,7 +4,7 @@ using UnityEngine.InputSystem;
 public class ClickRaycaster : MonoBehaviour
 {
     [SerializeField] private Camera cam;
-    [SerializeField] private LayerMask clickableLayers = ~0; // wszystko
+    [SerializeField] private LayerMask clickableLayers = ~0;
 
     private void Update()
     {

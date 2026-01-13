@@ -4,8 +4,8 @@ public class LocalHandView : MonoBehaviour
 {
     public static LocalHandView Instance { get; private set; }
 
-    [SerializeField] private HandFan fan;     // albo Twoja klasa fana
-    [SerializeField] private CardSpriteDB spriteDb; // mapuje CardId -> Sprite
+    [SerializeField] private HandFan fan;
+    [SerializeField] private CardSpriteDB spriteDb;
 
     private void Awake()
     {

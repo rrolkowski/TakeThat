@@ -59,7 +59,6 @@ public class OpponentHandsView : MonoBehaviour
 
             int relative = (oppSeat - localSeat + seatCount) % seatCount;
 
-            // relative=1 left, 2 top, 3 right (dla 4 graczy)
             Transform anchor = RelativeToAnchor(relative);
             if (anchor == null) continue;
 
@@ -69,9 +68,6 @@ public class OpponentHandsView : MonoBehaviour
 
     private Transform RelativeToAnchor(int relative)
     {
-        // Zak³adamy 4 seaty:
-        // 0 = ja (ignorujemy)
-        // 1 = left, 2 = top, 3 = right
         if (relative == 1) return uiLeft;
         if (relative == 2) return uiTop;
         if (relative == 3) return uiRight;
@@ -91,7 +87,7 @@ public class OpponentHandsView : MonoBehaviour
             float deg = Mathf.Lerp(-fanAngleRange * 0.5f, fanAngleRange * 0.5f, t);
             float rad = deg * Mathf.Deg2Rad;
 
-            // ³uk w lokalnych wspó³rzêdnych anchoru
+  
             var pos = new Vector3(Mathf.Sin(rad) * fanRadius, Mathf.Cos(rad) * fanRadius, 0f);
             pos += fanOffset;
             pos.z = -zStep * k;

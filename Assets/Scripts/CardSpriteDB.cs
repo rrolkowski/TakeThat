@@ -3,6 +3,7 @@ using UnityEngine;
 public class CardSpriteDB : MonoBehaviour
 {
     [Header("Index 0 = value 2, ..., index 8 = value 10")]
+    [Header("Cards sprite")]
     [SerializeField] private Sprite[] greenSprites = new Sprite[9];
     [SerializeField] private Sprite[] purpleSprites = new Sprite[9];
 

@@ -331,104 +331,6 @@ Transform:
   m_Children: []
   m_Father: {fileID: 515881820}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &254004089
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 254004092}
-  - component: {fileID: 254004091}
-  - component: {fileID: 254004090}
-  - component: {fileID: 254004093}
-  m_Layer: 0
-  m_Name: NetworkManager
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!114 &254004090
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 254004089}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fc64ff707d914a64e95f2ac0bf554c09, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: PurrNet.Runtime::PurrNet.Transports.UDPTransport
-  _automaticCloudSetups:
-    _adaptToEdgegap: 1
-  _serverPort: 5000
-  _maxConnections: 100
-  _address: 127.0.0.1
-  _timeoutInSeconds: 5
-  _pollEventsInUpdate: 0
---- !u!114 &254004091
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 254004089}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: baacc2bfe126d544691d4f39fa3785f9, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: PurrNet.Runtime::PurrNet.NetworkManager
-  _stopPlayingOnDisconnect: 0
-  _startServerFlags: 9
-  _startClientFlags: 7
-  _cookieScope: 1
-  _dontDestroyOnLoad: 0
-  _transport: {fileID: 254004090}
-  _networkPrefabs: {fileID: 11400000, guid: d520109a5f8604f4d8c799fe25f570e0, type: 2}
-  _networkAssets: {fileID: 11400000, guid: 8a9ae332ade4a834caa3e4765ebd4d54, type: 2}
-  _networkRules: {fileID: 11400000, guid: 57ad4cc976c21074181652c4f7179d44, type: 2}
-  _visibilityRules: {fileID: 11400000, guid: 8f014a5bd8dc68646a2a3c0b18c5bbd8, type: 2}
-  _authenticator: {fileID: 0}
-  _tickRate: 20
-  _patchLingeringProcessBug: 0
---- !u!4 &254004092
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 254004089}
-  serializedVersion: 2
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: -0, y: 0, z: -0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &254004093
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 254004089}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: ced7bf28cdbee104e8cdc34ab761b039, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: PurrNet.Runtime::PurrNet.PlayerSpawner
-  playerPrefab: {fileID: 0}
-  _playerPrefab: {fileID: 5642106131475174652, guid: 58365d368efba044d9267d1d45ec88d3, type: 3}
-  _ignoreNetworkRules: 0
-  spawnPoints:
-  - {fileID: 643009946}
-  - {fileID: 1691344054}
-  - {fileID: 2045725073}
-  - {fileID: 652065472}
 --- !u!1 &271572122
 GameObject:
   m_ObjectHideFlags: 0
@@ -969,6 +871,79 @@ MonoBehaviour:
   m_ShadowLayerMask: 1
   m_RenderingLayers: 1
   m_ShadowRenderingLayers: 1
+--- !u!1001 &416217779
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 538818725521047891, guid: a0bc922d93960b3449c2d13d822b705e, type: 3}
+      propertyPath: m_Name
+      value: NetworkManager
+      objectReference: {fileID: 0}
+    - target: {fileID: 2758601171976717998, guid: a0bc922d93960b3449c2d13d822b705e, type: 3}
+      propertyPath: 'spawnPoints.Array.data[0]'
+      value: 
+      objectReference: {fileID: 643009946}
+    - target: {fileID: 2758601171976717998, guid: a0bc922d93960b3449c2d13d822b705e, type: 3}
+      propertyPath: 'spawnPoints.Array.data[1]'
+      value: 
+      objectReference: {fileID: 1691344054}
+    - target: {fileID: 2758601171976717998, guid: a0bc922d93960b3449c2d13d822b705e, type: 3}
+      propertyPath: 'spawnPoints.Array.data[2]'
+      value: 
+      objectReference: {fileID: 2045725073}
+    - target: {fileID: 2758601171976717998, guid: a0bc922d93960b3449c2d13d822b705e, type: 3}
+      propertyPath: 'spawnPoints.Array.data[3]'
+      value: 
+      objectReference: {fileID: 652065472}
+    - target: {fileID: 3897925940492736739, guid: a0bc922d93960b3449c2d13d822b705e, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0.1276
+      objectReference: {fileID: 0}
+    - target: {fileID: 3897925940492736739, guid: a0bc922d93960b3449c2d13d822b705e, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 1.05
+      objectReference: {fileID: 0}
+    - target: {fileID: 3897925940492736739, guid: a0bc922d93960b3449c2d13d822b705e, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0.08032
+      objectReference: {fileID: 0}
+    - target: {fileID: 3897925940492736739, guid: a0bc922d93960b3449c2d13d822b705e, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 3897925940492736739, guid: a0bc922d93960b3449c2d13d822b705e, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3897925940492736739, guid: a0bc922d93960b3449c2d13d822b705e, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3897925940492736739, guid: a0bc922d93960b3449c2d13d822b705e, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3897925940492736739, guid: a0bc922d93960b3449c2d13d822b705e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3897925940492736739, guid: a0bc922d93960b3449c2d13d822b705e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 3897925940492736739, guid: a0bc922d93960b3449c2d13d822b705e, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: a0bc922d93960b3449c2d13d822b705e, type: 3}
 --- !u!1 &431453985
 GameObject:
   m_ObjectHideFlags: 0
@@ -1029,7 +1004,6 @@ Transform:
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
-  - {fileID: 2039896954}
   - {fileID: 241215783}
   - {fileID: 636740366}
   m_Father: {fileID: 0}
@@ -1562,6 +1536,58 @@ Transform:
   m_Children: []
   m_Father: {fileID: 408035076}
   m_LocalEulerAnglesHint: {x: 30, y: 180, z: 0}
+--- !u!1 &957325299
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 957325301}
+  - component: {fileID: 957325300}
+  m_Layer: 0
+  m_Name: PlayerSpawner
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &957325300
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 957325299}
+  m_Enabled: 0
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ced7bf28cdbee104e8cdc34ab761b039, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: PurrNet.Runtime::PurrNet.PlayerSpawner
+  playerPrefab: {fileID: 0}
+  _playerPrefab: {fileID: 5642106131475174652, guid: 58365d368efba044d9267d1d45ec88d3, type: 3}
+  _ignoreNetworkRules: 0
+  spawnPoints:
+  - {fileID: 643009946}
+  - {fileID: 1691344054}
+  - {fileID: 2045725073}
+  - {fileID: 652065472}
+--- !u!4 &957325301
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 957325299}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0.50049, y: 1.05, z: 0.44144}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1183454622
 GameObject:
   m_ObjectHideFlags: 0
@@ -1676,7 +1702,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1240849342}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: e6442a9da99ec5146a2607bbd7b88545, type: 3}
   m_Name: 
@@ -1773,6 +1799,7 @@ GameObject:
   - component: {fileID: 1548348037}
   - component: {fileID: 1548348039}
   - component: {fileID: 1548348038}
+  - component: {fileID: 1548348040}
   m_Layer: 0
   m_Name: GameSession
   m_TagString: Untagged
@@ -1839,6 +1866,28 @@ MonoBehaviour:
   _directChildren: []
   _networkRules: {fileID: 0}
   _visitiblityRules: {fileID: 11400000, guid: 8f014a5bd8dc68646a2a3c0b18c5bbd8, type: 2}
+--- !u!114 &1548348040
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1548348036}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9d5ad4ee122cb4c4d9229d377ff5f049, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::AutoStartGameSession
+  _isSetup: 0
+  _prefabId: -2147483648
+  _componentIndex: -2147483648
+  _shouldBePooled: 0
+  _parent: {fileID: 0}
+  _invertedPathToNearestParent: 
+  _directChildren: []
+  _networkRules: {fileID: 0}
+  _visitiblityRules: {fileID: 0}
+  minPlayers: 4
 --- !u!1 &1552454070
 GameObject:
   m_ObjectHideFlags: 0
@@ -2118,7 +2167,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!114 &1725751357
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2611,12 +2660,12 @@ Transform:
   m_GameObject: {fileID: 2039896952}
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalPosition: {x: 0, y: -0.2, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1818465890}
-  m_Father: {fileID: 515881820}
+  m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &2045725072
 GameObject:
@@ -2753,16 +2802,18 @@ SceneRoots:
   - {fileID: 1725751359}
   - {fileID: 515881820}
   - {fileID: 1845889995}
-  - {fileID: 254004092}
+  - {fileID: 416217779}
   - {fileID: 1548348037}
   - {fileID: 2113028702}
   - {fileID: 1892749959}
+  - {fileID: 957325301}
+  - {fileID: 891515647}
   - {fileID: 1857072462}
   - {fileID: 888028310}
+  - {fileID: 1824580627}
+  - {fileID: 1866837562}
+  - {fileID: 762064821}
+  - {fileID: 2039896954}
   - {fileID: 1531126695}
   - {fileID: 408035076}
-  - {fileID: 1824580627}
-  - {fileID: 762064821}
-  - {fileID: 1866837562}
   - {fileID: 1240849344}
-  - {fileID: 891515647}

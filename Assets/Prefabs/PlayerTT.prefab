@@ -9,10 +9,11 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 6309169351090391564}
+  - component: {fileID: 3091694982321190369}
   - component: {fileID: 3714223606809259655}
   - component: {fileID: 7650551678576858663}
-  - component: {fileID: 3091694982321190369}
   - component: {fileID: 3081556595269117727}
+  - component: {fileID: 1541765136499809938}
   m_Layer: 0
   m_Name: PlayerTT
   m_TagString: Untagged
@@ -35,6 +36,27 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &3091694982321190369
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5642106131475174652}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5681fe548eb84304ea28a286062791f5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: PurrNet.Runtime::PurrNet.NetworkIdentity
+  _isSetup: 0
+  _prefabId: -2147483648
+  _componentIndex: -2147483648
+  _shouldBePooled: 0
+  _parent: {fileID: 0}
+  _invertedPathToNearestParent: 
+  _directChildren: []
+  _networkRules: {fileID: 0}
+  _visitiblityRules: {fileID: 0}
 --- !u!114 &3714223606809259655
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -87,27 +109,6 @@ MonoBehaviour:
   _directChildren: []
   _networkRules: {fileID: 0}
   _visitiblityRules: {fileID: 0}
---- !u!114 &3091694982321190369
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 5642106131475174652}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5681fe548eb84304ea28a286062791f5, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: PurrNet.Runtime::PurrNet.NetworkIdentity
-  _isSetup: 0
-  _prefabId: -2147483648
-  _componentIndex: -2147483648
-  _shouldBePooled: 0
-  _parent: {fileID: 0}
-  _invertedPathToNearestParent: 
-  _directChildren: []
-  _networkRules: {fileID: 0}
-  _visitiblityRules: {fileID: 0}
 --- !u!114 &3081556595269117727
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -133,3 +134,23 @@ MonoBehaviour:
     _value: -1
     _ownerAuth: 0
     _sendIntervalInSeconds: 0
+  displayName:
+    _value: Player
+    _ownerAuth: 0
+    _sendIntervalInSeconds: 0
+  steamId:
+    _value: 0
+    _ownerAuth: 0
+    _sendIntervalInSeconds: 0
+--- !u!114 &1541765136499809938
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5642106131475174652}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: fe7e7e9e45651944bb2e8af7a6474e21, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::SteamIdentityReporter

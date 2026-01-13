@@ -20,6 +20,9 @@ public class PlayerBadge : MonoBehaviour
 
     public void SetIcon(Sprite s)
     {
-        if (icon != null) icon.sprite = s;
+        if (icon == null) return;
+
+        icon.sprite = s;
+        icon.enabled = (s != null);
     }
 }

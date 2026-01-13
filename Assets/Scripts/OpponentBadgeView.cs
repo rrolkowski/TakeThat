@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using PurrNet;
 using UnityEngine;
+using Steamworks;
 
 public class OpponentBadgesView : MonoBehaviour
 {
@@ -19,9 +20,15 @@ public class OpponentBadgesView : MonoBehaviour
 
     private readonly Dictionary<PlayerID, PlayerBadge> badges = new();
 
+    private static readonly Dictionary<ulong, Sprite> avatarSpriteCache = new();
+    private static Callback<AvatarImageLoaded_t> avatarLoadedCb;
+
     private void Awake()
     {
         Instance = this;
+
+        if (avatarLoadedCb == null)
+            avatarLoadedCb = Callback<AvatarImageLoaded_t>.Create(OnAvatarLoaded);
     }
 
     public void SetPlayers(PlayerID[] playerIds, int[] counts)
@@ -41,9 +48,11 @@ public class OpponentBadgesView : MonoBehaviour
         for (int i = 0; i < playerIds.Length && i < counts.Length; i++)
         {
             var pid = playerIds[i];
+
             if (pid == localId) continue;
 
-            if (!PlayerAvatar.allPlayers.TryGetValue(pid, out var avatar)) continue;
+            if (!PlayerAvatar.allPlayers.TryGetValue(pid, out var avatar) || avatar == null)
+                continue;
 
             int oppSeat = FindNearestSeatIndex(avatar.transform.position);
             if (oppSeat < 0) continue;
@@ -59,14 +68,82 @@ public class OpponentBadgesView : MonoBehaviour
                 badges[pid] = badge;
             }
 
-            // Na razie nazwa = PlayerID. Potem podmienisz na nick z lobby.
-            badge.SetName(pid.ToString());
+            badge.SetName(avatar.DisplayName);
             badge.SetCount(counts[i]);
+
+            if (avatar.SteamId != 0)
+                badge.SetIcon(TryGetAvatarSprite(avatar.SteamId));
+            else
+                badge.SetIcon(null);
 
             badge.transform.localPosition = Vector3.zero;
             badge.transform.localRotation = Quaternion.identity;
             badge.gameObject.SetActive(true);
         }
+    }
+
+    private static Sprite TryGetAvatarSprite(ulong steamId)
+    {
+        if (steamId == 0) return null;
+
+        if (avatarSpriteCache.TryGetValue(steamId, out var cached) && cached != null)
+            return cached;
+
+        int imageId = SteamFriends.GetLargeFriendAvatar(new CSteamID(steamId));
+
+        if (imageId <= 0) return null;
+
+        var sprite = SteamImageToSprite(imageId);
+        if (sprite != null)
+            avatarSpriteCache[steamId] = sprite;
+
+        return sprite;
+    }
+
+    private static void OnAvatarLoaded(AvatarImageLoaded_t cb)
+    {
+        if (cb.m_iImage <= 0) return;
+
+        ulong steamId = cb.m_steamID.m_SteamID;
+
+        var sprite = SteamImageToSprite(cb.m_iImage);
+        if (sprite != null)
+            avatarSpriteCache[steamId] = sprite;
+
+        if (Instance == null || sprite == null) return;
+
+        foreach (var kv in Instance.badges)
+        {
+            var pid = kv.Key;
+            var badge = kv.Value;
+            if (badge == null) continue;
+
+            if (PlayerAvatar.allPlayers.TryGetValue(pid, out var avatar) && avatar != null)
+            {
+                if (avatar.SteamId == steamId)
+                    badge.SetIcon(sprite);
+            }
+        }
+    }
+
+    private static Sprite SteamImageToSprite(int imageId)
+    {
+        if (!SteamUtils.GetImageSize(imageId, out uint w, out uint h)) return null;
+        if (w == 0 || h == 0) return null;
+
+        byte[] rgba = new byte[w * h * 4];
+        if (!SteamUtils.GetImageRGBA(imageId, rgba, rgba.Length)) return null;
+
+        var tex = new Texture2D((int)w, (int)h, TextureFormat.RGBA32, false, true);
+        tex.LoadRawTextureData(rgba);
+        tex.Apply(false, true);
+
+        return Sprite.Create(
+            tex,
+            new Rect(0, 0, tex.width, tex.height),
+            new Vector2(0.5f, 0.5f),
+            100f
+        );
     }
 
     private Transform RelativeToAnchor(int relative)

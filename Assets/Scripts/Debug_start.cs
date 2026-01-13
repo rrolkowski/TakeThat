@@ -1,3 +1,4 @@
+using PurrNet;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -9,10 +10,9 @@ public class Debug_start : MonoBehaviour
 
         if (Keyboard.current.f5Key.wasPressedThisFrame)
         {
-            if (GameSession.Instance != null)
+            if (GameSession.Instance != null && NetworkManager.main != null && NetworkManager.main.isServer)
             {
                 GameSession.Instance.Server_StartGame();
-                Debug.Log("Game Started!");
             }
         }
           
