@@ -1211,25 +1211,25 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::CardSpriteDB
   greenSprites:
-  - {fileID: 21300000, guid: 514190673c7d795429862ffb3805d634, type: 3}
-  - {fileID: 21300000, guid: 8a9f0e5101f43a64d926c8d30f35d091, type: 3}
-  - {fileID: 21300000, guid: 753d68cbf1c42f8498df1161c44735de, type: 3}
-  - {fileID: 21300000, guid: a4bf4aed924e4e641944a5219e5393e0, type: 3}
-  - {fileID: 21300000, guid: 900bf94d92c3da649b2ee20566ea5fa2, type: 3}
-  - {fileID: 21300000, guid: 7b756f6f6627508498d44d11b87bf4c5, type: 3}
-  - {fileID: 21300000, guid: 5da5f1b13be205a408aec74f58f7c049, type: 3}
-  - {fileID: 21300000, guid: bc601c50faf5b3445ac3d55d2a83fbc3, type: 3}
-  - {fileID: 21300000, guid: d13f9c0a5fe82834290563a233726a90, type: 3}
+  - {fileID: 21300000, guid: 856cb01cc7472b24783de15d0a712154, type: 3}
+  - {fileID: 21300000, guid: a9ede912956ca4a48a3303dd51b64273, type: 3}
+  - {fileID: 21300000, guid: c56f0957ec205054ebbbfa4cd9cb404f, type: 3}
+  - {fileID: 21300000, guid: aa7aa600f125cf44eae47d89e5a175d9, type: 3}
+  - {fileID: 21300000, guid: 401f0504e597d034b975a16afeff44a4, type: 3}
+  - {fileID: 21300000, guid: a5a56a6407217a7439947b6772749187, type: 3}
+  - {fileID: 21300000, guid: fecfda8c5f87f764182ba188adafa5d8, type: 3}
+  - {fileID: 21300000, guid: b8c2a0a2db3ee4f4dbdaa9463dda7342, type: 3}
+  - {fileID: 21300000, guid: cb9999a8c757ce745b69e675674ec360, type: 3}
   purpleSprites:
-  - {fileID: 21300000, guid: 39857ea6b49c65548b5b42181a86301c, type: 3}
-  - {fileID: 21300000, guid: f288e31a75b8afc43a3023c649986276, type: 3}
-  - {fileID: 21300000, guid: 922ccd3409b806f40a8d4233fdc12a6b, type: 3}
-  - {fileID: 21300000, guid: 67ce8db0f13b26b4faf0376aadec13ca, type: 3}
-  - {fileID: 21300000, guid: ef57ac5d5455ea148a2a5c4ac872434a, type: 3}
-  - {fileID: 21300000, guid: 20e65834893653f4f8584fc2281db725, type: 3}
-  - {fileID: 21300000, guid: 4d0df255d8373e54ebd27674cf26d0cd, type: 3}
-  - {fileID: 21300000, guid: 52e65ed00f531234aa7ea17df24043ec, type: 3}
-  - {fileID: 21300000, guid: 02cca3a2356a4334aa4b56f5a69577b7, type: 3}
+  - {fileID: 21300000, guid: ff6bbb89e369dde4ea1df2dc3ff89da2, type: 3}
+  - {fileID: 21300000, guid: 4cfc5bd04aa35e243a17ca72560eb1eb, type: 3}
+  - {fileID: 21300000, guid: 1c28e832c3815864998b6248f2a6f58e, type: 3}
+  - {fileID: 21300000, guid: 5dac25f6c6c19244db49a76987fd3c2c, type: 3}
+  - {fileID: 21300000, guid: 8b9cf730ccf7c904294a6f5190d132ee, type: 3}
+  - {fileID: 21300000, guid: 2320284592e624040b76e31e0441b4b0, type: 3}
+  - {fileID: 21300000, guid: 0262171c3d6ca5b4c857e7708f8da45b, type: 3}
+  - {fileID: 21300000, guid: 545c61e48cc62194e9413464420fad55, type: 3}
+  - {fileID: 21300000, guid: a19d80d532374d04781a8fd0dda452c6, type: 3}
 --- !u!4 &762064821
 Transform:
   m_ObjectHideFlags: 0
@@ -1667,7 +1667,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: 21300000, guid: 8a9f0e5101f43a64d926c8d30f35d091, type: 3}
+  m_Sprite: {fileID: 21300000, guid: a5a56a6407217a7439947b6772749187, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -1982,7 +1982,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: 21300000, guid: 514190673c7d795429862ffb3805d634, type: 3}
+  m_Sprite: {fileID: 21300000, guid: ff6bbb89e369dde4ea1df2dc3ff89da2, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -2127,7 +2127,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: 21300000, guid: 02cca3a2356a4334aa4b56f5a69577b7, type: 3}
+  m_Sprite: {fileID: 21300000, guid: 8b9cf730ccf7c904294a6f5190d132ee, type: 3}
   m_Color: {r: 1, g: 1, b: 1, a: 1}
   m_FlipX: 0
   m_FlipY: 0
