@@ -2,9 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 
 public class HoverRaycaster : MonoBehaviour
-{
-
-
+{ 
     [SerializeField] private Camera cam;
 
     [Header("Layers")]
@@ -17,6 +15,9 @@ public class HoverRaycaster : MonoBehaviour
 
     void Update()
     {
+        if (hovered != null && !hovered.gameObject.activeInHierarchy)
+            hovered = null;
+
         if (Mouse.current == null) return;
 
         var ray = cam.ScreenPointToRay(Mouse.current.position.ReadValue());
@@ -57,4 +58,11 @@ public class HoverRaycaster : MonoBehaviour
 
         return best;
     }
+
+    public void ForceClearHover()
+    {
+        if (hovered != null) hovered.OnHoverExit();
+        hovered = null;
+    }
+
 }

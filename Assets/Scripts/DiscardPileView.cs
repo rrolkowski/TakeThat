@@ -12,7 +12,7 @@ public class DiscardPileView : MonoBehaviour
     [SerializeField] private Transform pileAnchor;
 
     [Header("Fallback start (for opponents)")]
-    [SerializeField] private Transform defaultFrom; // np. gdzieœ nad sto³em / przy œrodku
+    [SerializeField] private Transform defaultFrom;
 
     [Header("Stack look")]
     [SerializeField] private int maxVisible = 25;
@@ -27,9 +27,9 @@ public class DiscardPileView : MonoBehaviour
     [SerializeField] private float endScale = 1.0f;
 
     [Header("3D rotation")]
-    [SerializeField] private float startX = 0f;      // w locie startujemy z 0
-    [SerializeField] private float endX = 90f;       // na stole zawsze 90
-    [SerializeField] private float startZ = 0f;      // jeœli nie podasz inaczej
+    [SerializeField] private float startX = 0f;
+    [SerializeField] private float endX = 90f;
+    [SerializeField] private float startZ = 0f;
     [SerializeField] private bool useCardStartZIfProvided = true;
 
     private readonly List<SpriteRenderer> stack = new();
@@ -39,7 +39,6 @@ public class DiscardPileView : MonoBehaviour
     public Vector3 DefaultFromPos =>
         defaultFrom != null ? defaultFrom.position : (pileAnchor != null ? pileAnchor.position + Vector3.up * 2f : Vector3.zero);
 
-    // Najprostsze API: rzucamy kartê ze œwiata (np. z pozycji klikniêtej karty)
     public void ThrowToPile(CardId card, Vector3 fromWorldPos, float? optionalStartZ = null)
     {
         if (spriteDb == null || pileCardPrefab == null || pileAnchor == null) return;
@@ -72,7 +71,6 @@ public class DiscardPileView : MonoBehaviour
 
         float z1 = Random.Range(-randomRotZ, randomRotZ);
 
-        // ³uk
         Vector3 mid = (start + end) * 0.5f + Vector3.up * arcHeight;
 
         float t = 0f;
@@ -81,12 +79,10 @@ public class DiscardPileView : MonoBehaviour
             t += Time.deltaTime / Mathf.Max(0.0001f, throwTime);
             float u = Mathf.Clamp01(t);
 
-            // quadratic bezier
             Vector3 a = Vector3.Lerp(start, mid, u);
             Vector3 b = Vector3.Lerp(mid, end, u);
             sr.transform.position = Vector3.Lerp(a, b, u);
 
-            // ROT: X p³ynnie 0 -> 90, Z p³ynnie z0 -> z1
             float x = Mathf.Lerp(startX, endX, u);
             float z = Mathf.Lerp(z0, z1, u);
             sr.transform.rotation = Quaternion.Euler(x, 0f, z);
@@ -96,9 +92,8 @@ public class DiscardPileView : MonoBehaviour
             yield return null;
         }
 
-        // commit
         sr.transform.SetParent(pileAnchor, true);
-        sr.transform.rotation = Quaternion.Euler(endX, 0f, z1); // finalnie pewne 90
+        sr.transform.rotation = Quaternion.Euler(endX, 0f, z1);
         stack.Add(sr);
 
         while (stack.Count > maxVisible)

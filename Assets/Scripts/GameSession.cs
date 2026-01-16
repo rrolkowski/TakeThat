@@ -9,7 +9,16 @@ public class GameSession : NetworkBehaviour
 
     [Header("Rules")]
     [SerializeField] private int initialHandSize = 7;
-    [SerializeField] private int copiesPerCard = 4;
+    [SerializeField] private int maxHandSize = 25;
+
+    [Header("Deck - Numbers")]
+    [SerializeField] private int copiesPerNumberPerColor = 4;
+
+    [Header("Deck - Specials")]
+    [SerializeField] private int copiesSkip = 16;
+    [SerializeField] private int copiesReverse = 16;
+    [SerializeField] private int copiesDraw2 = 16;
+    [SerializeField] private int copiesDraw3 = 16;
 
     private CardId topCard;
     private PlayerID currentTurn;
@@ -28,11 +37,13 @@ public class GameSession : NetworkBehaviour
     private PlayerID localPid;
     private bool hasLocalPid;
 
+    private int pendingDraw = 0;
+    private CardType pendingType = CardType.Number;
+
     private void Awake()
     {
         Instance = this;
         Debug.Log($"[GameSession] Awake. isServer={(NetworkManager.main != null && NetworkManager.main.isServer)}");
-
     }
 
     protected override void OnSpawned(bool asServer)
@@ -63,10 +74,13 @@ public class GameSession : NetworkBehaviour
         direction = 1;
         turnIndex = 0;
 
-        Server_BuildDeck(copiesPerCard);
+        pendingDraw = 0;
+        pendingType = CardType.Number;
+
+        Server_BuildDeck();
         Server_CreateHands(turnOrder);
         Server_Deal(turnOrder, initialHandSize);
-        Server_FlipTop();
+        Server_FlipTop_NoSpecialsOnStart();
 
         currentTurn = GetCurrentTurn();
 
@@ -83,22 +97,51 @@ public class GameSession : NetworkBehaviour
         if (!started) return;
 
         var pid = info.sender;
-
         if (pid != currentTurn) return;
 
         if (!hands.TryGetValue(pid, out var hand)) return;
 
-        int idx = hand.FindIndex(c => c.suit == card.suit && c.value == card.value);
+        int idx = hand.FindIndex(c => c.type == card.type && c.suit == card.suit && c.value == card.value);
         if (idx < 0) return;
 
-        if (!IsPlayable(card, topCard)) return;
+        if (!IsPlayable(card)) return;
 
         hand.RemoveAt(idx);
 
         topCard = card;
         discardPile.Push(card);
 
-        Server_AdvanceTurn(steps: 1);
+        int steps = 1;
+
+        switch (card.type)
+        {
+            case CardType.Skip:
+                steps = 2;
+                break;
+
+            case CardType.Reverse:
+                direction *= -1;
+                steps = 1;
+                break;
+
+            case CardType.Draw2:
+                {
+                    var next = PeekNextPlayer(1);
+                    Server_GiveCards(next, 2);
+                    steps = 2;
+                    break;
+                }
+
+            case CardType.Draw3:
+                {
+                    pendingType = CardType.Draw3;
+                    pendingDraw += 3;
+                    steps = 1;
+                    break;
+                }
+        }
+
+        Server_AdvanceTurn(steps);
 
         Server_RecalcHandCounts();
         Server_BroadcastPublicState();
@@ -106,9 +149,66 @@ public class GameSession : NetworkBehaviour
         Target_SetHand(pid, hand.ToArray());
     }
 
-    private static bool IsPlayable(CardId card, CardId top)
+    [ServerRpc(requireOwnership: false)]
+    public void Server_RequestDraw(RPCInfo info = default)
     {
-        return card.suit == top.suit || card.value == top.value;
+        if (!started) return;
+
+        var pid = info.sender;
+        if (pid != currentTurn) return;
+
+        if (!hands.TryGetValue(pid, out var hand)) return;
+
+        if (pendingDraw > 0 && pendingType == CardType.Draw3)
+        {
+            int canTake = Mathf.Max(0, maxHandSize - hand.Count);
+            int toAdd = Mathf.Min(pendingDraw, canTake);
+
+            for (int i = 0; i < toAdd; i++)
+                hand.Add(Server_DrawCard());
+
+            pendingDraw = 0;
+            pendingType = CardType.Number;
+
+            Server_AdvanceTurn(steps: 1);
+
+            Server_RecalcHandCounts();
+            Server_BroadcastPublicState();
+            Target_SetHand(pid, hand.ToArray());
+            return;
+        }
+
+        if (hand.Count >= maxHandSize)
+        {
+            Server_AdvanceTurn(steps: 1);
+
+            Server_RecalcHandCounts();
+            Server_BroadcastPublicState();
+            Target_SetHand(pid, hand.ToArray());
+            return;
+        }
+
+        hand.Add(Server_DrawCard());
+
+        Server_AdvanceTurn(steps: 1);
+
+        Server_RecalcHandCounts();
+        Server_BroadcastPublicState();
+        Target_SetHand(pid, hand.ToArray());
+    }
+
+    private bool IsPlayable(CardId card)
+    {
+        if (pendingDraw > 0 && pendingType == CardType.Draw3)
+            return card.type == CardType.Draw3;
+
+        if (card.type != CardType.Number)
+            return true;
+
+        if (topCard.type != CardType.Number)
+            return true;
+
+        return card.suit == topCard.suit || card.value == topCard.value;
     }
 
     private void Server_RecalcHandCounts()
@@ -144,14 +244,13 @@ public class GameSession : NetworkBehaviour
         currentTurn = newCurrentTurn;
         direction = newDirection;
 
-        Debug.Log($"[Public] Top Card: {topCard.suit} {topCard.value} | Turn: {currentTurn} | Dir: {direction}");
+        //Debug.Log($"[Public] Top Card: {topCard} | Turn: {currentTurn} | Dir: {direction} | pendingDraw={pendingDraw}");
 
         if (PlayerAvatar.allPlayers.TryGetValue(currentTurn, out var avatar))
             TurnIndicator.Instance?.SetTarget(avatar.transform);
 
         OpponentHandsView.Instance?.SetCounts(playerIds, counts);
         OpponentBadgesView.Instance?.SetPlayers(playerIds, counts);
-
     }
 
     [TargetRpc]
@@ -163,35 +262,13 @@ public class GameSession : NetworkBehaviour
         LocalHandView.Instance?.SetHand(hand);
     }
 
-
-    [ServerRpc(requireOwnership: false)]
-    public void Server_RequestDraw(RPCInfo info = default)
-    {
-        if (!started) return;
-
-        var pid = info.sender;
-
-        if (pid != currentTurn) return;
-
-        if (!hands.TryGetValue(pid, out var hand)) return;
-
-        var card = Server_DrawCard();
-        hand.Add(card);
-
-        Server_AdvanceTurn(steps: 1);
-
-        Server_RecalcHandCounts();
-        Server_BroadcastPublicState();
-        Target_SetHand(pid, hand.ToArray());
-    }
-
     private CardId Server_DrawCard()
     {
         if (drawPile.Count == 0)
         {
             if (discardPile.Count <= 1)
             {
-                return new CardId { suit = Suit.Green, value = 2 };
+                return new CardId { type = CardType.Number, suit = Suit.Green, value = 2 };
             }
 
             var top = discardPile.Pop();
@@ -232,22 +309,71 @@ public class GameSession : NetworkBehaviour
         currentTurn = GetCurrentTurn();
     }
 
-    private void Server_BuildDeck(int copiesPerCardLocal)
+    private PlayerID PeekNextPlayer(int stepsFromCurrent)
+    {
+        if (turnOrder.Count == 0) return default;
+
+        int idx = turnIndex;
+        int s = Mathf.Abs(stepsFromCurrent);
+        for (int i = 0; i < s; i++)
+        {
+            idx += direction;
+            if (idx < 0) idx = turnOrder.Count - 1;
+            else if (idx >= turnOrder.Count) idx = 0;
+        }
+
+        return turnOrder[idx];
+    }
+
+    private void Server_GiveCards(PlayerID pid, int count)
+    {
+        if (!hands.TryGetValue(pid, out var hand)) return;
+
+        int canTake = Mathf.Max(0, maxHandSize - hand.Count);
+        int toAdd = Mathf.Min(count, canTake);
+
+        for (int i = 0; i < toAdd; i++)
+            hand.Add(Server_DrawCard());
+
+        Target_SetHand(pid, hand.ToArray());
+    }
+
+    private void Server_BuildDeck()
     {
         drawPile.Clear();
         discardPile.Clear();
         hands.Clear();
 
-        var deck = new List<CardId>(2 * 9 * copiesPerCardLocal);
+        var suits = new[] { Suit.Green, Suit.Purple, Suit.Blue, Suit.Red };
+        var deck = new List<CardId>(suits.Length * 9 * copiesPerNumberPerColor + copiesSkip + copiesReverse + copiesDraw2 + copiesDraw3);
 
-        for (int c = 0; c < copiesPerCardLocal; c++)
+        for (int c = 0; c < copiesPerNumberPerColor; c++)
         {
             for (int v = 2; v <= 10; v++)
             {
-                deck.Add(new CardId { suit = Suit.Green, value = v });
-                deck.Add(new CardId { suit = Suit.Purple, value = v });
+                for (int s = 0; s < suits.Length; s++)
+                {
+                    deck.Add(new CardId
+                    {
+                        type = CardType.Number,
+                        suit = suits[s],
+                        value = v
+                    });
+                }
             }
         }
+
+        for (int i = 0; i < copiesSkip; i++)
+            deck.Add(new CardId { type = CardType.Skip, suit = Suit.None, value = 0 });
+
+        for (int i = 0; i < copiesReverse; i++)
+            deck.Add(new CardId { type = CardType.Reverse, suit = Suit.None, value = 0 });
+
+        for (int i = 0; i < copiesDraw2; i++)
+            deck.Add(new CardId { type = CardType.Draw2, suit = Suit.None, value = 0 });
+
+        for (int i = 0; i < copiesDraw3; i++)
+            deck.Add(new CardId { type = CardType.Draw3, suit = Suit.None, value = 0 });
 
         Shuffle(deck);
         for (int i = 0; i < deck.Count; i++)
@@ -258,7 +384,7 @@ public class GameSession : NetworkBehaviour
     {
         hands.Clear();
         foreach (var pid in playerList)
-            hands[pid] = new List<CardId>(initialHandSize + 8);
+            hands[pid] = new List<CardId>(initialHandSize + 16);
     }
 
     private void Server_Deal(List<PlayerID> playerList, int count)
@@ -277,17 +403,41 @@ public class GameSession : NetworkBehaviour
         }
     }
 
-    private void Server_FlipTop()
+    private void Server_FlipTop_NoSpecialsOnStart()
     {
         if (drawPile.Count == 0)
         {
             Debug.LogWarning("[GameSession] Cannot flip top card: draw pile empty.");
-            topCard = new CardId { suit = Suit.Green, value = 2 };
+            topCard = new CardId { type = CardType.Number, suit = Suit.Green, value = 2 };
             discardPile.Push(topCard);
             return;
         }
 
-        topCard = drawPile.Pop();
+        var specials = new List<CardId>(8);
+        CardId chosen = default;
+        bool found = false;
+
+        while (drawPile.Count > 0)
+        {
+            var c = drawPile.Pop();
+            if (c.type == CardType.Number)
+            {
+                chosen = c;
+                found = true;
+                break;
+            }
+            specials.Add(c);
+        }
+
+        if (!found)
+        {
+            chosen = new CardId { type = CardType.Number, suit = Suit.Green, value = 2 };
+        }
+
+        for (int i = 0; i < specials.Count; i++)
+            discardPile.Push(specials[i]);
+
+        topCard = chosen;
         discardPile.Push(topCard);
     }
 

@@ -38,6 +38,12 @@ public class CardView : MonoBehaviour
 
         basePos = transform.localPosition;
         baseRot = transform.localRotation;
+
+        if (anim != null) StopCoroutine(anim);
+        anim = null;
+
+        transform.localScale = baseScale;
+        if (hoverLockObject != null) hoverLockObject.SetActive(false);
     }
 
     public void OnClicked()
@@ -92,4 +98,18 @@ public class CardView : MonoBehaviour
             yield return null;
         }
     }
+
+    public void ForceUnhover()
+    {
+        if (anim != null) StopCoroutine(anim);
+        anim = null;
+
+        if (hoverLockObject != null)
+            hoverLockObject.SetActive(false);
+
+        transform.localPosition = basePos;
+        transform.localRotation = baseRot;
+        transform.localScale = baseScale;
+    }
+
 }
