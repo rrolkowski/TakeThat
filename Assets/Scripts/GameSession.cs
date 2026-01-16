@@ -20,7 +20,12 @@ public class GameSession : NetworkBehaviour
     [SerializeField] private int copiesDraw2 = 16;
     [SerializeField] private int copiesDraw3 = 16;
 
+    [Header("Draw3 Reaction Window")]
+    [SerializeField] private float draw3ReactionSeconds = 7f;
+
     private CardId topCard;
+    public CardId TopCard => topCard;
+
     private PlayerID currentTurn;
     private int direction = 1;
 
@@ -30,6 +35,9 @@ public class GameSession : NetworkBehaviour
 
     private readonly List<PlayerID> turnOrder = new();
     private readonly Dictionary<PlayerID, int> handCounts = new();
+
+    private bool draw3ReactionActive;
+    private float draw3ReactionEndsAt;
 
     private bool started;
     private int turnIndex;
@@ -142,6 +150,7 @@ public class GameSession : NetworkBehaviour
         }
 
         Server_AdvanceTurn(steps);
+        Server_StartDraw3ReactionIfPossible();
 
         Server_RecalcHandCounts();
         Server_BroadcastPublicState();
@@ -159,18 +168,9 @@ public class GameSession : NetworkBehaviour
 
         if (!hands.TryGetValue(pid, out var hand)) return;
 
-        if (pendingDraw > 0 && pendingType == CardType.Draw3)
+        if (draw3ReactionActive && pendingDraw > 0 && pendingType == CardType.Draw3)
         {
-            int canTake = Mathf.Max(0, maxHandSize - hand.Count);
-            int toAdd = Mathf.Min(pendingDraw, canTake);
-
-            for (int i = 0; i < toAdd; i++)
-                hand.Add(Server_DrawCard());
-
-            pendingDraw = 0;
-            pendingType = CardType.Number;
-
-            Server_AdvanceTurn(steps: 1);
+            Server_ResolvePendingDraw3_KeepTurn();
 
             Server_RecalcHandCounts();
             Server_BroadcastPublicState();
@@ -197,9 +197,23 @@ public class GameSession : NetworkBehaviour
         Target_SetHand(pid, hand.ToArray());
     }
 
+    private void Update()
+    {
+        if (NetworkManager.main == null || !NetworkManager.main.isServer) return;
+        if (!started) return;
+
+        if (draw3ReactionActive && Time.time >= draw3ReactionEndsAt)
+        {
+            Server_ResolvePendingDraw3_KeepTurn();
+
+            Server_RecalcHandCounts();
+            Server_BroadcastPublicState();
+        }
+    }
+
     private bool IsPlayable(CardId card)
     {
-        if (pendingDraw > 0 && pendingType == CardType.Draw3)
+        if (draw3ReactionActive && pendingDraw > 0 && pendingType == CardType.Draw3)
             return card.type == CardType.Draw3;
 
         if (card.type != CardType.Number)
@@ -210,6 +224,57 @@ public class GameSession : NetworkBehaviour
 
         return card.suit == topCard.suit || card.value == topCard.value;
     }
+
+    private bool Server_PlayerHasDraw3(PlayerID pid)
+    {
+        if (!hands.TryGetValue(pid, out var hand)) return false;
+        for (int i = 0; i < hand.Count; i++)
+        {
+            if (hand[i].type == CardType.Draw3)
+                return true;
+        }
+        return false;
+    }
+
+    private void Server_StartDraw3ReactionIfPossible()
+    {
+        // Zak³adamy: currentTurn jest graczem, który ma reagowaæ
+        if (pendingDraw <= 0 || pendingType != CardType.Draw3)
+        {
+            draw3ReactionActive = false;
+            return;
+        }
+
+        // Wariant B: timer tylko jeœli gracz ma Draw3
+        if (!Server_PlayerHasDraw3(currentTurn))
+        {
+            Server_ResolvePendingDraw3_KeepTurn();
+            return;
+        }
+
+        draw3ReactionActive = true;
+        draw3ReactionEndsAt = Time.time + draw3ReactionSeconds;
+    }
+
+    private void Server_ResolvePendingDraw3_KeepTurn()
+    {
+        // Dobierz tyle ile siê zmieœci do maxHandSize, reszta przepada.
+        if (hands.TryGetValue(currentTurn, out var hand))
+        {
+            int canTake = Mathf.Max(0, maxHandSize - hand.Count);
+            int toAdd = Mathf.Min(pendingDraw, canTake);
+
+            for (int i = 0; i < toAdd; i++)
+                hand.Add(Server_DrawCard());
+
+            Target_SetHand(currentTurn, hand.ToArray());
+        }
+
+        pendingDraw = 0;
+        pendingType = CardType.Number;
+        draw3ReactionActive = false;
+    }
+
 
     private void Server_RecalcHandCounts()
     {
@@ -226,7 +291,9 @@ public class GameSession : NetworkBehaviour
         for (int i = 0; i < pids.Length; i++)
             counts[i] = handCounts.TryGetValue(pids[i], out var c) ? c : 0;
 
-        Observers_PublicStateChanged(topCard, currentTurn, direction, pids, counts);
+        float draw3TimeLeft = draw3ReactionActive ? Mathf.Max(0f, draw3ReactionEndsAt - Time.time) : 0f;
+
+        Observers_PublicStateChanged(topCard, currentTurn, direction, pids, counts, pendingDraw, draw3ReactionActive, draw3TimeLeft, draw3ReactionSeconds);
     }
 
     [ObserversRpc]
@@ -235,7 +302,11 @@ public class GameSession : NetworkBehaviour
         PlayerID newCurrentTurn,
         int newDirection,
         PlayerID[] playerIds,
-        int[] counts
+        int[] counts,
+        int pending,
+        bool reactionActive,
+        float reactionTimeLeft,
+        float reactionTotalSeconds
     )
     {
         topCard = newTopCard;
@@ -251,6 +322,18 @@ public class GameSession : NetworkBehaviour
 
         OpponentHandsView.Instance?.SetCounts(playerIds, counts);
         OpponentBadgesView.Instance?.SetPlayers(playerIds, counts);
+
+        if (reactionActive && hasLocalPid && localPid == newCurrentTurn)
+        {
+            Draw3TimerUI.Instance?.Show(pending, reactionTimeLeft, reactionTotalSeconds);
+        }
+        else
+        {
+            Draw3TimerUI.Instance?.Hide();
+        }
+
+        LocalHandView.Instance?.RefreshDrawIndicator();
+
     }
 
     [TargetRpc]
