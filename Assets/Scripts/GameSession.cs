@@ -25,6 +25,9 @@ public class GameSession : NetworkBehaviour
     private bool started;
     private int turnIndex;
 
+    private PlayerID localPid;
+    private bool hasLocalPid;
+
     private void Awake()
     {
         Instance = this;
@@ -35,6 +38,11 @@ public class GameSession : NetworkBehaviour
     protected override void OnSpawned(bool asServer)
     {
         Debug.Log($"[GameSession] OnSpawned asServer={asServer}");
+    }
+
+    public bool IsMyTurn()
+    {
+        return hasLocalPid && localPid == currentTurn;
     }
 
     [ServerRpc(requireOwnership: false)]
@@ -149,6 +157,9 @@ public class GameSession : NetworkBehaviour
     [TargetRpc]
     private void Target_SetHand(PlayerID target, CardId[] hand)
     {
+        localPid = target;
+        hasLocalPid = true;
+
         LocalHandView.Instance?.SetHand(hand);
     }
 
