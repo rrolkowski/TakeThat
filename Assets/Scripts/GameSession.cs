@@ -1,6 +1,7 @@
+using PurrNet;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using PurrNet;
 using UnityEngine;
 
 public class GameSession : NetworkBehaviour
@@ -47,6 +48,19 @@ public class GameSession : NetworkBehaviour
 
     private int pendingDraw = 0;
     private CardType pendingType = CardType.Number;
+
+    public int Direction => direction;
+    public event Action<int> OnDirectionChanged;
+
+    private int lastEffectId;
+    private PlayerID lastEffectTarget;
+    private CardType lastEffectType;
+    private int lastEffectValue;
+
+    private int clientLastEffectId;
+    private int clientPendingDraw;
+    private bool clientReactionActive;
+
 
     private void Awake()
     {
@@ -124,6 +138,12 @@ public class GameSession : NetworkBehaviour
         switch (card.type)
         {
             case CardType.Skip:
+                var target = PeekNextPlayer(1);
+                lastEffectId++;
+                lastEffectTarget = target;
+                lastEffectType = CardType.Skip;
+                lastEffectValue = 0;
+
                 steps = 2;
                 break;
 
@@ -136,6 +156,12 @@ public class GameSession : NetworkBehaviour
                 {
                     var next = PeekNextPlayer(1);
                     Server_GiveCards(next, 2);
+
+                    lastEffectId++;
+                    lastEffectTarget = next;
+                    lastEffectType = CardType.Draw2;
+                    lastEffectValue = 2;
+
                     steps = 2;
                     break;
                 }
@@ -144,6 +170,14 @@ public class GameSession : NetworkBehaviour
                 {
                     pendingType = CardType.Draw3;
                     pendingDraw += 3;
+
+                    var targett = PeekNextPlayer(1);
+
+                    lastEffectId++;
+                    lastEffectTarget = targett;
+                    lastEffectType = CardType.Draw3;
+                    lastEffectValue = pendingDraw;
+
                     steps = 1;
                     break;
                 }
@@ -293,7 +327,8 @@ public class GameSession : NetworkBehaviour
 
         float draw3TimeLeft = draw3ReactionActive ? Mathf.Max(0f, draw3ReactionEndsAt - Time.time) : 0f;
 
-        Observers_PublicStateChanged(topCard, currentTurn, direction, pids, counts, pendingDraw, draw3ReactionActive, draw3TimeLeft, draw3ReactionSeconds);
+        Observers_PublicStateChanged(topCard, currentTurn, direction, pids, counts, pendingDraw, draw3ReactionActive, draw3TimeLeft, draw3ReactionSeconds,
+            lastEffectId, lastEffectTarget, lastEffectType, lastEffectValue);
     }
 
     [ObserversRpc]
@@ -306,7 +341,11 @@ public class GameSession : NetworkBehaviour
         int pending,
         bool reactionActive,
         float reactionTimeLeft,
-        float reactionTotalSeconds
+        float reactionTotalSeconds,
+        int effectId,
+        PlayerID effectTarget,
+        CardType effectType,
+        int effectValue
     )
     {
         topCard = newTopCard;
@@ -314,6 +353,10 @@ public class GameSession : NetworkBehaviour
 
         currentTurn = newCurrentTurn;
         direction = newDirection;
+        OnDirectionChanged?.Invoke(direction);
+
+        clientPendingDraw = pending;
+        clientReactionActive = reactionActive;
 
         //Debug.Log($"[Public] Top Card: {topCard} | Turn: {currentTurn} | Dir: {direction} | pendingDraw={pendingDraw}");
 
@@ -322,6 +365,13 @@ public class GameSession : NetworkBehaviour
 
         OpponentHandsView.Instance?.SetCounts(playerIds, counts);
         OpponentBadgesView.Instance?.SetPlayers(playerIds, counts);
+        PlayerEffectView.Instance?.SetPlayers(playerIds);
+
+        if (effectId != 0 && effectId != clientLastEffectId)
+        {
+            clientLastEffectId = effectId;
+            PlayerEffectView.Instance?.ShowEffect(effectTarget, effectType, effectValue);
+        }
 
         if (reactionActive && hasLocalPid && localPid == newCurrentTurn)
         {
@@ -528,7 +578,7 @@ public class GameSession : NetworkBehaviour
     {
         for (int i = list.Count - 1; i > 0; i--)
         {
-            int j = Random.Range(0, i + 1);
+            int j = UnityEngine.Random.Range(0, i + 1);
             (list[i], list[j]) = (list[j], list[i]);
         }
     }
