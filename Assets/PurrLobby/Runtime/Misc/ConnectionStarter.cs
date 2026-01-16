@@ -15,15 +15,16 @@ namespace PurrLobby
     {
         private NetworkManager _networkManager;
         private LobbyDataHolder _lobbyDataHolder;
-        
+
         private void Awake()
         {
-            if(!TryGetComponent(out _networkManager)) {
+            if (!TryGetComponent(out _networkManager))
+            {
                 PurrLogger.LogError($"Failed to get {nameof(NetworkManager)} component.", this);
             }
-            
+
             _lobbyDataHolder = FindFirstObjectByType<LobbyDataHolder>();
-            if(!_lobbyDataHolder)
+            if (!_lobbyDataHolder)
                 PurrLogger.LogError($"Failed to get {nameof(LobbyDataHolder)} component.", this);
         }
 
@@ -34,42 +35,88 @@ namespace PurrLobby
                 PurrLogger.LogError($"Failed to start connection. {nameof(NetworkManager)} is null!", this);
                 return;
             }
-            
+
             if (!_lobbyDataHolder)
             {
                 PurrLogger.LogError($"Failed to start connection. {nameof(LobbyDataHolder)} is null!", this);
                 return;
             }
-            
+
             if (!_lobbyDataHolder.CurrentLobby.IsValid)
             {
                 PurrLogger.LogError($"Failed to start connection. Lobby is invalid!", this);
                 return;
             }
 
-            if(_networkManager.transport is PurrTransport) {
-                (_networkManager.transport as PurrTransport).roomName = _lobbyDataHolder.CurrentLobby.LobbyId;
-            } 
-            
+            if (_networkManager.transport is PurrTransport purrTransport)
+            {
+                purrTransport.roomName = _lobbyDataHolder.CurrentLobby.LobbyId;
+            }
+
 #if UTP_LOBBYRELAY
-            else if(_networkManager.transport is UTPTransport) {
-                if(_lobbyDataHolder.CurrentLobby.IsOwner) {
-                    (_networkManager.transport as UTPTransport).InitializeRelayServer((Allocation)_lobbyDataHolder.CurrentLobby.ServerObject);
+            // --- UTP Relay Transport ---
+            else if (_networkManager.transport is UTPTransport utpTransport)
+            {
+                if (_lobbyDataHolder.CurrentLobby.IsOwner)
+                {
+                    utpTransport.InitializeRelayServer((Allocation)_lobbyDataHolder.CurrentLobby.ServerObject);
                 }
-                (_networkManager.transport as UTPTransport).InitializeRelayClient(_lobbyDataHolder.CurrentLobby.Properties["JoinCode"]);
+
+                utpTransport.InitializeRelayClient(_lobbyDataHolder.CurrentLobby.Properties["JoinCode"]);
             }
 #else
-                //P2P Connection, receive IP/Port from server
+            else if (_networkManager.transport != null && _networkManager.transport.GetType().Name == "SteamTransport")
+            {
+                if (_lobbyDataHolder.CurrentLobby.IsOwner)
+                {
+                    _networkManager.StartHost();
+                    return;
+                }
+
+                if (_lobbyDataHolder.CurrentLobby.Properties == null ||
+                    !_lobbyDataHolder.CurrentLobby.Properties.TryGetValue("HostSteamId", out var hostSteamId) ||
+                    string.IsNullOrWhiteSpace(hostSteamId))
+                {
+                    PurrLogger.LogError("Missing HostSteamId in lobby properties. Client cannot connect via SteamTransport.", this);
+                    return;
+                }
+
+                var transport = _networkManager.transport;
+                var t = transport.GetType();
+
+                var addrField = t.GetField("address");
+                if (addrField != null)
+                {
+                    addrField.SetValue(transport, hostSteamId);
+                }
+                else
+                {
+                    var addrProp = t.GetProperty("address");
+                    if (addrProp != null)
+                    {
+                        addrProp.SetValue(transport, hostSteamId);
+                    }
+                    else
+                    {
+                        PurrLogger.LogError("SteamTransport has no 'address' field/property.", this);
+                        return;
+                    }
+                }
+
+                StartCoroutine(StartClient());
+                return;
+            }
 #endif
 
-            if(_lobbyDataHolder.CurrentLobby.IsOwner)
-                _networkManager.StartServer();
-            StartCoroutine(StartClient());
+            if (_lobbyDataHolder.CurrentLobby.IsOwner)
+                _networkManager.StartHost();
+            else
+                StartCoroutine(StartClient());
         }
 
         private IEnumerator StartClient()
         {
-            yield return new WaitForSeconds(1f);
+            yield return new WaitForSeconds(2f);
             _networkManager.StartClient();
         }
     }

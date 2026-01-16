@@ -2812,7 +2812,7 @@ MonoBehaviour:
   _directChildren: []
   _networkRules: {fileID: 0}
   _visitiblityRules: {fileID: 0}
-  minPlayers: 1
+  minPlayers: 3
 --- !u!1 &1552454070
 GameObject:
   m_ObjectHideFlags: 0

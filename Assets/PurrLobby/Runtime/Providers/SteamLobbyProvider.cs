@@ -92,6 +92,10 @@ namespace PurrLobby.Providers
                     tcs.TrySetResult(true);
                     Steamworks.SteamMatchmaking.SetLobbyData(lobbyId, "Name", lobbyName);
                     Steamworks.SteamMatchmaking.SetLobbyData(lobbyId, "Started", "False");
+ 
+                    var hostSteamId = Steamworks.SteamUser.GetSteamID().m_SteamID.ToString();
+                    Steamworks.SteamMatchmaking.SetLobbyData(lobbyId, "HostSteamId", hostSteamId);
+
                 }
                 else
                     tcs.TrySetResult(false);

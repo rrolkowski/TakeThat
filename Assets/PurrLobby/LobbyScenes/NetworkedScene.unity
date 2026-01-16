@@ -129,9 +129,9 @@ GameObject:
   m_Component:
   - component: {fileID: 104676489}
   - component: {fileID: 104676488}
-  - component: {fileID: 104676491}
   - component: {fileID: 104676490}
   - component: {fileID: 104676492}
+  - component: {fileID: 104676493}
   m_Layer: 0
   m_Name: NetworkManager
   m_TagString: Untagged
@@ -156,7 +156,7 @@ MonoBehaviour:
   _startClientFlags: 0
   _cookieScope: 1
   _dontDestroyOnLoad: 1
-  _transport: {fileID: 104676491}
+  _transport: {fileID: 104676493}
   _networkPrefabs: {fileID: 11400000, guid: d520109a5f8604f4d8c799fe25f570e0, type: 2}
   _networkAssets: {fileID: 11400000, guid: 8a9ae332ade4a834caa3e4765ebd4d54, type: 2}
   _networkRules: {fileID: 11400000, guid: d8799083b96579a42b8b2d03e4ceae98, type: 2}
@@ -191,24 +191,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e5c476fd9733ed148b4631bd99c76108, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
---- !u!114 &104676491
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 104676486}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 332e746c3c3253246aacad4d5559f1fb, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  _masterServer: https://purrtransport.purrservers.com/
-  _roomName: 
-  _region: france
-  _host: purrtransport-france.purrservers.com
-  _timeoutInSeconds: 15
-  _pollEventsInUpdate: 0
 --- !u!114 &104676492
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -223,6 +205,22 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::LoadGameOnConnected
   networkManager: {fileID: 104676488}
   gameSceneName: SampleScene
+--- !u!114 &104676493
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 104676486}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4ccc454d6a19ac140b15f8d619d0fb5e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: PurrNet.Steam.Runtime::PurrNet.Steam.SteamTransport
+  _serverPort: 5003
+  _dedicatedServer: 0
+  _peerToPeer: 1
+  _address: 76561198399623743
 --- !u!1 &270819952
 GameObject:
   m_ObjectHideFlags: 0
