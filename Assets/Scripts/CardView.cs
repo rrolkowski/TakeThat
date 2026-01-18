@@ -50,6 +50,17 @@ public class CardView : MonoBehaviour
     {
         if (GameSession.Instance == null) return;
         if (!GameSession.Instance.IsMyTurn()) return;
+
+        if (Card.type == CardType.Number && LocalHandView.Instance != null)
+        {
+            int copies = LocalHandView.Instance.CountCopiesInHand(Card);
+            if (copies >= 2)
+            {
+                GameSession.Instance.Server_RequestPlayMany(Card, copies);
+                return;
+            }
+        }
+
         GameSession.Instance.Server_RequestPlay(Card);
     }
 

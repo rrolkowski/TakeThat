@@ -59,5 +59,15 @@ public class LocalHandView : MonoBehaviour
 
         return card.suit == top.suit || card.value == top.value;
     }
+
+    public int CountCopiesInHand(CardId card)
+    {
+        int c = 0;
+        for (int i = 0; i < currentHand.Length; i++)
+            if (currentHand[i].type == card.type && currentHand[i].suit == card.suit && currentHand[i].value == card.value)
+                c++;
+        return c;
+    }
+
 }
 

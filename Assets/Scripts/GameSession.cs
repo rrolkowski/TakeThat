@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 public class GameSession : NetworkBehaviour
 {
@@ -94,7 +95,8 @@ public class GameSession : NetworkBehaviour
 
         started = true;
         direction = 1;
-        turnIndex = 0;
+        //turnIndex = 0;
+        turnIndex = Random.Range(0, turnOrder.Count);
 
         pendingDraw = 0;
         pendingType = CardType.Number;
@@ -170,14 +172,6 @@ public class GameSession : NetworkBehaviour
                 {
                     pendingType = CardType.Draw3;
                     pendingDraw += 3;
-
-                    var targett = PeekNextPlayer(1);
-
-                    lastEffectId++;
-                    lastEffectTarget = targett;
-                    lastEffectType = CardType.Draw3;
-                    lastEffectValue = pendingDraw;
-
                     steps = 1;
                     break;
                 }
@@ -191,6 +185,56 @@ public class GameSession : NetworkBehaviour
 
         Target_SetHand(pid, hand.ToArray());
     }
+
+    [ServerRpc(requireOwnership: false)]
+    public void Server_RequestPlayMany(CardId prototype, int count, RPCInfo info = default)
+    {
+        if (!started) return;
+
+        var pid = info.sender;
+        if (pid != currentTurn) return;
+
+        if (count <= 0) return;
+
+        if (draw3ReactionActive && pendingDraw > 0 && pendingType == CardType.Draw3)
+            return;
+
+        if (prototype.type != CardType.Number) return;
+
+        if (!IsPlayable(prototype)) return;
+
+        if (!hands.TryGetValue(pid, out var hand)) return;
+
+        int have = 0;
+        for (int i = 0; i < hand.Count; i++)
+            if (hand[i].type == prototype.type && hand[i].suit == prototype.suit && hand[i].value == prototype.value)
+                have++;
+
+        if (have < count) return;
+
+        int removed = 0;
+        for (int i = hand.Count - 1; i >= 0 && removed < count; i--)
+        {
+            if (hand[i].type == prototype.type && hand[i].suit == prototype.suit && hand[i].value == prototype.value)
+            {
+                hand.RemoveAt(i);
+                removed++;
+            }
+        }
+
+        for (int i = 0; i < count; i++)
+            discardPile.Push(prototype);
+
+        topCard = prototype;
+
+        Server_AdvanceTurn(steps: 1);
+
+        Server_RecalcHandCounts();
+        Server_BroadcastPublicState();
+
+        Target_SetHand(pid, hand.ToArray());
+    }
+
 
     [ServerRpc(requireOwnership: false)]
     public void Server_RequestDraw(RPCInfo info = default)
@@ -272,14 +316,12 @@ public class GameSession : NetworkBehaviour
 
     private void Server_StartDraw3ReactionIfPossible()
     {
-        // Zak³adamy: currentTurn jest graczem, który ma reagowaæ
         if (pendingDraw <= 0 || pendingType != CardType.Draw3)
         {
             draw3ReactionActive = false;
             return;
         }
 
-        // Wariant B: timer tylko jeœli gracz ma Draw3
         if (!Server_PlayerHasDraw3(currentTurn))
         {
             Server_ResolvePendingDraw3_KeepTurn();
@@ -292,16 +334,26 @@ public class GameSession : NetworkBehaviour
 
     private void Server_ResolvePendingDraw3_KeepTurn()
     {
-        // Dobierz tyle ile siê zmieœci do maxHandSize, reszta przepada.
+        int actuallyDrew = 0;
+
         if (hands.TryGetValue(currentTurn, out var hand))
         {
             int canTake = Mathf.Max(0, maxHandSize - hand.Count);
             int toAdd = Mathf.Min(pendingDraw, canTake);
+            actuallyDrew = toAdd;
 
             for (int i = 0; i < toAdd; i++)
                 hand.Add(Server_DrawCard());
 
             Target_SetHand(currentTurn, hand.ToArray());
+        }
+
+        if (actuallyDrew > 0)
+        {
+            lastEffectId++;
+            lastEffectTarget = currentTurn;
+            lastEffectType = CardType.Draw3;
+            lastEffectValue = actuallyDrew;
         }
 
         pendingDraw = 0;
