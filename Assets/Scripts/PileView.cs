@@ -3,6 +3,8 @@ using UnityEngine;
 
 public class PileView : MonoBehaviour
 {
+    public static PileView Instance { get; private set; }
+
     [SerializeField] private Transform pileRoot;
     [SerializeField] private Transform pileAnchor;
     [SerializeField] private CardSpriteDB spriteDb;
@@ -20,6 +22,16 @@ public class PileView : MonoBehaviour
 
     private readonly List<PileCardVisual> active = new List<PileCardVisual>(64);
     private readonly Queue<PileCardVisual> pool = new Queue<PileCardVisual>(64);
+    
+    private void Awake()
+    {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+        Instance = this;
+    }
 
     public void AddCard(CardId card, int pileIndex, int seed)
     {
@@ -118,5 +130,40 @@ public class PileView : MonoBehaviour
     private static float Range(System.Random rng, float min, float max)
     {
         return (float)(min + (rng.NextDouble() * (max - min)));
+    }
+
+    public void Clear()
+    {
+        for (int i = active.Count - 1; i >= 0; i--)
+        {
+            var vis = active[i];
+            if (vis == null) continue;
+
+            if (usePooling)
+            {
+                vis.gameObject.SetActive(false);
+                vis.transform.SetParent(pileRoot, worldPositionStays: false);
+                pool.Enqueue(vis);
+            }
+            else
+            {
+                Destroy(vis.gameObject);
+            }
+        }
+        active.Clear();
+
+        if (pileRoot != null)
+        {
+            for (int i = pileRoot.childCount - 1; i >= 0; i--)
+            {
+                var ch = pileRoot.GetChild(i);
+                if (ch == null) continue;
+
+                if (!usePooling)
+                    Destroy(ch.gameObject);
+                else
+                    ch.gameObject.SetActive(false);
+            }
+        }
     }
 }

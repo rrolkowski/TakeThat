@@ -20,6 +20,12 @@ public class LocalHandView : MonoBehaviour
         currentHand = hand;
         fan.SetHand(hand, spriteDb.GetSprite);
 
+        if (GameSession.Instance != null && GameSession.Instance.IsTurnTransition)
+        {
+            DrawPileIndicator.Instance?.SetVisible(false);
+            return;
+        }
+
         RefreshDrawIndicator();
     }
 

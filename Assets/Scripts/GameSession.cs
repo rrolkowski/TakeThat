@@ -9,6 +9,8 @@ public class GameSession : NetworkBehaviour
 {
     public static GameSession Instance { get; private set; }
 
+    [SerializeField] private string lobbySceneName = "LobbyScene";
+
     [Header("Rules")]
     [SerializeField] private int initialHandSize = 7;
     [SerializeField] private int maxHandSize = 25;
@@ -25,11 +27,17 @@ public class GameSession : NetworkBehaviour
     [Header("Draw3 Reaction Window")]
     [SerializeField] private float draw3ReactionSeconds = 7f;
 
-    private CardId topCard;
-    public CardId TopCard => topCard;
+    [Header("Turn Timer")]
+    [SerializeField] private float turnSeconds = 12f;
 
-    private PlayerID currentTurn;
-    private int direction = 1;
+    [Header("Turn Transition Delay")]
+    [SerializeField] private float turnAdvanceDelay = 0.75f;
+
+    [Header("Game Over")]
+
+    [SerializeField] private bool autoReturnToLobbyOnGameOver = false;
+    
+    private readonly HashSet<PlayerID> resetVotes = new();
 
     private readonly Dictionary<PlayerID, List<CardId>> hands = new();
     private readonly Stack<CardId> drawPile = new();
@@ -37,6 +45,22 @@ public class GameSession : NetworkBehaviour
 
     private readonly List<PlayerID> turnOrder = new();
     private readonly Dictionary<PlayerID, int> handCounts = new();
+
+    private bool gameOver;
+    private PlayerID winnerPid;
+
+    private bool advanceScheduled;
+    private float advanceAt;
+    private int advanceSteps;
+
+    private bool turnTimerActive;
+    private float turnEndsAt;
+
+    private CardId topCard;
+    public CardId TopCard => topCard;
+
+    private PlayerID currentTurn;
+    private int direction = 1;
 
     private bool draw3ReactionActive;
     private float draw3ReactionEndsAt;
@@ -50,6 +74,7 @@ public class GameSession : NetworkBehaviour
     private int pendingDraw = 0;
     private CardType pendingType = CardType.Number;
 
+    private bool clientTurnTransition;
     public int Direction => direction;
     public event Action<int> OnDirectionChanged;
 
@@ -65,6 +90,11 @@ public class GameSession : NetworkBehaviour
 
     private void Awake()
     {
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
         Instance = this;
         Debug.Log($"[GameSession] Awake. isServer={(NetworkManager.main != null && NetworkManager.main.isServer)}");
     }
@@ -76,7 +106,7 @@ public class GameSession : NetworkBehaviour
 
     public bool IsMyTurn()
     {
-        return hasLocalPid && localPid == currentTurn;
+        return hasLocalPid && localPid == currentTurn && !clientTurnTransition;
     }
 
     [ServerRpc(requireOwnership: false)]
@@ -107,6 +137,8 @@ public class GameSession : NetworkBehaviour
         Server_FlipTop_NoSpecialsOnStart();
 
         currentTurn = GetCurrentTurn();
+        Server_StartTurnTimer();
+
 
         foreach (var pid in turnOrder)
             Target_SetHand(pid, hands[pid].ToArray());
@@ -120,6 +152,10 @@ public class GameSession : NetworkBehaviour
     {
         if (!started) return;
 
+        if (gameOver) return;
+
+        if (advanceScheduled) return;
+
         var pid = info.sender;
         if (pid != currentTurn) return;
 
@@ -131,6 +167,15 @@ public class GameSession : NetworkBehaviour
         if (!IsPlayable(card)) return;
 
         hand.RemoveAt(idx);
+
+        Server_CheckWin(pid);
+        if (gameOver)
+        {
+            Target_SetHand(pid, hand.ToArray());
+            Server_RecalcHandCounts();
+            Server_BroadcastPublicState();
+            return;
+        }
 
         topCard = card;
         discardPile.Push(card);
@@ -186,8 +231,7 @@ public class GameSession : NetworkBehaviour
                 }
         }
 
-        Server_AdvanceTurn(steps);
-        Server_StartDraw3ReactionIfPossible();
+        Server_ScheduleAdvanceTurn(steps);
 
         Server_RecalcHandCounts();
         Server_BroadcastPublicState();
@@ -199,6 +243,10 @@ public class GameSession : NetworkBehaviour
     public void Server_RequestPlayMany(CardId prototype, int count, RPCInfo info = default)
     {
         if (!started) return;
+
+        if (gameOver) return;
+
+        if (advanceScheduled) return;
 
         var pid = info.sender;
         if (pid != currentTurn) return;
@@ -231,6 +279,15 @@ public class GameSession : NetworkBehaviour
             }
         }
 
+        Server_CheckWin(pid);
+        if (gameOver)
+        {
+            Target_SetHand(pid, hand.ToArray());
+            Server_RecalcHandCounts();
+            Server_BroadcastPublicState();
+            return;
+        }
+
         for (int i = 0; i < count; i++)
             discardPile.Push(prototype);
 
@@ -246,7 +303,7 @@ public class GameSession : NetworkBehaviour
 
         topCard = prototype;
 
-        Server_AdvanceTurn(steps: 1);
+        Server_ScheduleAdvanceTurn(steps: 1);
 
         Server_RecalcHandCounts();
         Server_BroadcastPublicState();
@@ -259,6 +316,10 @@ public class GameSession : NetworkBehaviour
     public void Server_RequestDraw(RPCInfo info = default)
     {
         if (!started) return;
+
+        if (gameOver) return;
+
+        if (advanceScheduled) return;
 
         var pid = info.sender;
         if (pid != currentTurn) return;
@@ -277,7 +338,7 @@ public class GameSession : NetworkBehaviour
 
         if (hand.Count >= maxHandSize)
         {
-            Server_AdvanceTurn(steps: 1);
+            Server_ScheduleAdvanceTurn(steps: 1);
 
             Server_RecalcHandCounts();
             Server_BroadcastPublicState();
@@ -287,12 +348,87 @@ public class GameSession : NetworkBehaviour
 
         hand.Add(Server_DrawCard());
 
-        Server_AdvanceTurn(steps: 1);
+        Server_ScheduleAdvanceTurn(steps: 1);
 
         Server_RecalcHandCounts();
         Server_BroadcastPublicState();
         Target_SetHand(pid, hand.ToArray());
     }
+
+    [TargetRpc]
+    private void Target_SetHand(PlayerID target, CardId[] hand)
+    {
+        localPid = target;
+        hasLocalPid = true;
+
+        LocalHandView.Instance?.SetHand(hand);
+    }
+
+    [ServerRpc(requireOwnership: false)]
+    public void Server_ResetMatch(RPCInfo info = default)
+    {
+        if (!NetworkManager.main.isServer) return;
+
+        resetVotes.Clear();
+        gameOver = false;
+        winnerPid = default;
+
+        started = false;
+        advanceScheduled = false;
+        Server_StopTurnTimer();
+        draw3ReactionActive = false;
+        pendingDraw = 0;
+        pendingType = CardType.Number;
+
+        Observers_MatchReset();
+
+        Server_StartGame();
+        Server_BroadcastPublicState();
+    }
+
+    [ServerRpc(requireOwnership: false)]
+    public void Server_ReturnToLobby(RPCInfo info = default)
+    {
+        var nm = NetworkManager.main;
+        if (nm == null || !nm.isServer) return;
+
+        // tylko host (seat 0) mo¿e to wywo³aæ
+        if (!PlayerAvatar.allPlayers.TryGetValue(info.sender, out var av) || av.SeatIndex != 0)
+            return;
+
+        gameOver = false;
+        started = false;
+        advanceScheduled = false;
+        Server_StopTurnTimer();
+        draw3ReactionActive = false;
+        pendingDraw = 0;
+
+        Observers_ReturnToLobby();
+
+        nm.sceneModule.LoadSceneAsync(lobbySceneName);
+    }
+
+    [ServerRpc(requireOwnership: false)]
+    public void Server_VoteReset(bool vote, RPCInfo info = default)
+    {
+        if (!NetworkManager.main.isServer) return;
+        if (!gameOver) return;
+
+        var pid = info.sender;
+
+        if (vote) resetVotes.Add(pid);
+        else resetVotes.Remove(pid);
+
+        Server_BroadcastResetVotes();
+
+        int total = PlayerAvatar.allPlayers.Count;
+        if (total > 0 && resetVotes.Count >= total)
+        {
+            resetVotes.Clear();
+            Server_ResetMatch();
+        }
+    }
+
 
     private void Update()
     {
@@ -306,20 +442,130 @@ public class GameSession : NetworkBehaviour
             Server_RecalcHandCounts();
             Server_BroadcastPublicState();
         }
+
+        if (turnTimerActive && Time.time >= turnEndsAt)
+        {
+            Server_HandleTurnTimeout();
+        }
+
+        if (advanceScheduled && Time.time >= advanceAt)
+        {
+            advanceScheduled = false;
+
+            Server_AdvanceTurn(advanceSteps);
+
+            Server_StartTurnTimer();
+            Server_StartDraw3ReactionIfPossible();
+
+            Server_RecalcHandCounts();
+            Server_BroadcastPublicState();
+        }
     }
 
-    private bool IsPlayable(CardId card)
+    [ObserversRpc]
+    private void Observers_MatchReset()
     {
-        if (draw3ReactionActive && pendingDraw > 0 && pendingType == CardType.Draw3)
-            return card.type == CardType.Draw3;
+        GameOverPopup.Instance?.Hide();
+        PileView.Instance.Clear();
+        TopCardView.Instance?.Clear(clearSprite: false);
+    }
 
-        if (card.type != CardType.Number)
-            return true;
+    [ObserversRpc]
+    private void Observers_GameOver(PlayerID winner, string winnerName, ulong winnerSteamId)
+    {
+        GameOverPopup.Instance?.Show(winner, winnerName, winnerSteamId);
+    }
 
-        if (topCard.type != CardType.Number)
-            return true;
+    [ObserversRpc]
+    private void Observers_ReturnToLobby()
+    {
+        //LobbyFlow.Instance?.ReturnToLobby();
+    }
 
-        return card.suit == topCard.suit || card.value == topCard.value;
+    [ObserversRpc]
+    private void Observers_CardPlayed(int seatIndex, CardId card, int count, int pileStartIndex, int seed)
+    {
+        PileThrowController.Instance?.PlayThrow(seatIndex, card, count, pileStartIndex, seed);
+    }
+
+    [ObserversRpc]
+    private void Observers_PublicStateChanged(
+        CardId newTopCard,
+        PlayerID newCurrentTurn,
+        int newDirection,
+        PlayerID[] playerIds,
+        int[] counts,
+        int pending,
+        bool reactionActive,
+        float reactionTimeLeft,
+        float reactionTotalSeconds,
+        int effectId,
+        PlayerID effectTarget,
+        CardType effectType,
+        int effectValue,
+        float turnTimeLeft,
+        float turnSeconds,
+        bool turnTransition
+
+    )
+    {
+        topCard = newTopCard;
+        TopCardView.Instance?.SetCard(topCard, onlyIfUnset: true);
+
+        currentTurn = newCurrentTurn;
+        direction = newDirection;
+        OnDirectionChanged?.Invoke(direction);
+
+        clientPendingDraw = pending;
+        clientReactionActive = reactionActive;
+        clientTurnTransition = turnTransition;
+
+        //Debug.Log($"[Public] Top Card: {topCard} | Turn: {currentTurn} | Dir: {direction} | pendingDraw={pendingDraw}");
+
+        if (PlayerAvatar.allPlayers.TryGetValue(currentTurn, out var avatar))
+            TurnIndicator.Instance?.SetTarget(avatar.transform);
+
+        OpponentHandsView.Instance?.SetCounts(playerIds, counts);
+        OpponentBadgesView.Instance?.SetPlayers(playerIds, counts);
+        PlayerEffectView.Instance?.SetPlayers(playerIds);
+
+        if (effectId != 0 && effectId != clientLastEffectId)
+        {
+            clientLastEffectId = effectId;
+            PlayerEffectView.Instance?.ShowEffect(effectTarget, effectType, effectValue);
+        }
+
+        if (reactionActive && hasLocalPid && localPid == newCurrentTurn)
+        {
+            Draw3TimerUI.Instance?.Show(pending, reactionTimeLeft, reactionTotalSeconds);
+        }
+        else
+        {
+            Draw3TimerUI.Instance?.Hide();
+        }
+
+        if (turnTransition)
+        {
+            DrawPileIndicator.Instance?.SetVisible(false);
+        }
+        else
+        {
+            LocalHandView.Instance?.RefreshDrawIndicator();
+        }
+    }
+    private void Server_BroadcastPublicState()
+    {
+        var pids = turnOrder.ToArray();
+        var counts = new int[pids.Length];
+
+        for (int i = 0; i < pids.Length; i++)
+            counts[i] = handCounts.TryGetValue(pids[i], out var c) ? c : 0;
+
+        float draw3TimeLeft = draw3ReactionActive ? Mathf.Max(0f, draw3ReactionEndsAt - Time.time) : 0f;
+        float turnTimeLeft = turnTimerActive ? Mathf.Max(0f, turnEndsAt - Time.time) : 0f;
+
+        Observers_PublicStateChanged(topCard, currentTurn, direction, pids, counts, pendingDraw, draw3ReactionActive, draw3TimeLeft, draw3ReactionSeconds,
+            lastEffectId, lastEffectTarget, lastEffectType, lastEffectValue, turnTimeLeft, turnSeconds, advanceScheduled);
     }
 
     private bool Server_PlayerHasDraw3(PlayerID pid)
@@ -380,7 +626,6 @@ public class GameSession : NetworkBehaviour
         draw3ReactionActive = false;
     }
 
-
     private void Server_RecalcHandCounts()
     {
         handCounts.Clear();
@@ -388,89 +633,105 @@ public class GameSession : NetworkBehaviour
             handCounts[kv.Key] = kv.Value.Count;
     }
 
-    private void Server_BroadcastPublicState()
+    private void Server_StartTurnTimer()
     {
-        var pids = turnOrder.ToArray();
-        var counts = new int[pids.Length];
-
-        for (int i = 0; i < pids.Length; i++)
-            counts[i] = handCounts.TryGetValue(pids[i], out var c) ? c : 0;
-
-        float draw3TimeLeft = draw3ReactionActive ? Mathf.Max(0f, draw3ReactionEndsAt - Time.time) : 0f;
-
-        Observers_PublicStateChanged(topCard, currentTurn, direction, pids, counts, pendingDraw, draw3ReactionActive, draw3TimeLeft, draw3ReactionSeconds,
-            lastEffectId, lastEffectTarget, lastEffectType, lastEffectValue);
+        turnTimerActive = true;
+        turnEndsAt = Time.time + turnSeconds;
     }
 
-    [ObserversRpc]
-    private void Observers_CardPlayed(int seatIndex, CardId card, int count, int pileStartIndex, int seed)
+    private void Server_StopTurnTimer()
     {
-        PileThrowController.Instance?.PlayThrow(seatIndex, card, count, pileStartIndex, seed);
+        turnTimerActive = false;
     }
 
-    [ObserversRpc]
-    private void Observers_PublicStateChanged(
-        CardId newTopCard,
-        PlayerID newCurrentTurn,
-        int newDirection,
-        PlayerID[] playerIds,
-        int[] counts,
-        int pending,
-        bool reactionActive,
-        float reactionTimeLeft,
-        float reactionTotalSeconds,
-        int effectId,
-        PlayerID effectTarget,
-        CardType effectType,
-        int effectValue
-    )
+    private void Server_HandleTurnTimeout()
     {
-        topCard = newTopCard;
-        TopCardView.Instance?.SetCard(topCard, onlyIfUnset: true);
+        if (!started) return;
 
-        currentTurn = newCurrentTurn;
-        direction = newDirection;
-        OnDirectionChanged?.Invoke(direction);
-
-        clientPendingDraw = pending;
-        clientReactionActive = reactionActive;
-
-        //Debug.Log($"[Public] Top Card: {topCard} | Turn: {currentTurn} | Dir: {direction} | pendingDraw={pendingDraw}");
-
-        if (PlayerAvatar.allPlayers.TryGetValue(currentTurn, out var avatar))
-            TurnIndicator.Instance?.SetTarget(avatar.transform);
-
-        OpponentHandsView.Instance?.SetCounts(playerIds, counts);
-        OpponentBadgesView.Instance?.SetPlayers(playerIds, counts);
-        PlayerEffectView.Instance?.SetPlayers(playerIds);
-
-        if (effectId != 0 && effectId != clientLastEffectId)
+        var pid = currentTurn;
+        if (draw3ReactionActive && pendingDraw > 0 && pendingType == CardType.Draw3)
         {
-            clientLastEffectId = effectId;
-            PlayerEffectView.Instance?.ShowEffect(effectTarget, effectType, effectValue);
-        }
-
-        if (reactionActive && hasLocalPid && localPid == newCurrentTurn)
-        {
-            Draw3TimerUI.Instance?.Show(pending, reactionTimeLeft, reactionTotalSeconds);
+            Server_ResolvePendingDraw3_KeepTurn();
+            Server_ScheduleAdvanceTurn(steps: 1);
         }
         else
         {
-            Draw3TimerUI.Instance?.Hide();
+            if (hands.TryGetValue(pid, out var hand))
+            {
+                if (hand.Count < maxHandSize)
+                {
+                    hand.Add(Server_DrawCard());
+                    Target_SetHand(pid, hand.ToArray());
+                }
+            }
+
+            Server_ScheduleAdvanceTurn(steps: 1);
         }
 
-        LocalHandView.Instance?.RefreshDrawIndicator();
-
+        Server_RecalcHandCounts();
+        Server_BroadcastPublicState();
     }
 
-    [TargetRpc]
-    private void Target_SetHand(PlayerID target, CardId[] hand)
+    private void Server_ScheduleAdvanceTurn(int steps)
     {
-        localPid = target;
-        hasLocalPid = true;
+        if (!NetworkManager.main.isServer) return;
 
-        LocalHandView.Instance?.SetHand(hand);
+        advanceScheduled = true;
+        advanceSteps = steps;
+        advanceAt = Time.time + turnAdvanceDelay;
+
+        Server_StopTurnTimer();
     }
+
+    private void Server_CheckWin(PlayerID pid)
+    {
+        if (gameOver) return;
+        if (!hands.TryGetValue(pid, out var hand)) return;
+
+        if (hand.Count == 0)
+        {
+            resetVotes.Clear();
+            Server_BroadcastResetVotes();
+            gameOver = true;
+            winnerPid = pid;
+
+            advanceScheduled = false;
+            Server_StopTurnTimer();
+            draw3ReactionActive = false;
+            pendingDraw = 0;
+
+            string name = "Winner";
+            ulong steamId = 0;
+
+            if (PlayerAvatar.allPlayers.TryGetValue(pid, out var avatar) && avatar != null)
+            {
+                name = avatar.DisplayName;
+                steamId = avatar.SteamId;
+            }
+
+            Observers_GameOver(pid, name, steamId);
+
+            if (autoReturnToLobbyOnGameOver)
+                Server_ReturnToLobby();
+        }
+    }
+
+    private void Server_BroadcastResetVotes()
+    {
+        resetVotes.RemoveWhere(pid => !PlayerAvatar.allPlayers.ContainsKey(pid));
+
+        int total = PlayerAvatar.allPlayers.Count;
+        var voters = resetVotes.ToArray();
+
+        Observers_ResetVotesChanged(resetVotes.Count, total, voters);
+    }
+
+    [ObserversRpc]
+    private void Observers_ResetVotesChanged(int votes, int total, PlayerID[] voters)
+    {
+        GameOverPopup.Instance?.SetResetVotes(votes, total, voters);
+    }
+
 
     private CardId Server_DrawCard()
     {
@@ -494,16 +755,6 @@ public class GameSession : NetworkBehaviour
         return drawPile.Pop();
     }
 
-    private PlayerID GetCurrentTurn()
-    {
-        if (turnOrder.Count == 0) return default;
-
-        if (turnIndex < 0) turnIndex = 0;
-        if (turnIndex >= turnOrder.Count) turnIndex %= turnOrder.Count;
-
-        return turnOrder[turnIndex];
-    }
-
     private void Server_AdvanceTurn(int steps)
     {
         if (turnOrder.Count == 0) return;
@@ -517,22 +768,6 @@ public class GameSession : NetworkBehaviour
         }
 
         currentTurn = GetCurrentTurn();
-    }
-
-    private PlayerID PeekNextPlayer(int stepsFromCurrent)
-    {
-        if (turnOrder.Count == 0) return default;
-
-        int idx = turnIndex;
-        int s = Mathf.Abs(stepsFromCurrent);
-        for (int i = 0; i < s; i++)
-        {
-            idx += direction;
-            if (idx < 0) idx = turnOrder.Count - 1;
-            else if (idx >= turnOrder.Count) idx = 0;
-        }
-
-        return turnOrder[idx];
     }
 
     private void Server_GiveCards(PlayerID pid, int count)
@@ -612,7 +847,6 @@ public class GameSession : NetworkBehaviour
             }
         }
     }
-
     private void Server_FlipTop_NoSpecialsOnStart()
     {
         if (drawPile.Count == 0)
@@ -649,6 +883,56 @@ public class GameSession : NetworkBehaviour
 
         topCard = chosen;
         discardPile.Push(topCard);
+    }
+    private PlayerID GetCurrentTurn()
+    {
+        if (turnOrder.Count == 0) return default;
+
+        if (turnIndex < 0) turnIndex = 0;
+        if (turnIndex >= turnOrder.Count) turnIndex %= turnOrder.Count;
+
+        return turnOrder[turnIndex];
+    }
+
+    private PlayerID PeekNextPlayer(int stepsFromCurrent)
+    {
+        if (turnOrder.Count == 0) return default;
+
+        int idx = turnIndex;
+        int s = Mathf.Abs(stepsFromCurrent);
+        for (int i = 0; i < s; i++)
+        {
+            idx += direction;
+            if (idx < 0) idx = turnOrder.Count - 1;
+            else if (idx >= turnOrder.Count) idx = 0;
+        }
+
+        return turnOrder[idx];
+    }
+
+    private bool IsPlayable(CardId card)
+    {
+        if (draw3ReactionActive && pendingDraw > 0 && pendingType == CardType.Draw3)
+            return card.type == CardType.Draw3;
+
+        if (card.type != CardType.Number)
+            return true;
+
+        if (topCard.type != CardType.Number)
+            return true;
+
+        return card.suit == topCard.suit || card.value == topCard.value;
+    }
+
+    public bool IsTurnTransition
+    {
+        get
+        {
+            if (NetworkManager.main != null && NetworkManager.main.isServer)
+                return clientTurnTransition || advanceScheduled;
+
+            return clientTurnTransition;
+        }
     }
 
     private static void Shuffle(List<CardId> list)

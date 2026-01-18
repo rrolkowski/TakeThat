@@ -24,4 +24,12 @@ public class TopCardView : MonoBehaviour
         if (onlyIfUnset) locked = true;
     }
 
+    public void Clear(bool clearSprite = true)
+    {
+        locked = false;
+
+        if (clearSprite && sr != null)
+            sr.sprite = null;
+    }
+
 }
