@@ -95,7 +95,7 @@ public class GameSession : NetworkBehaviour
 
         started = true;
         direction = 1;
-        //turnIndex = 0;
+        turnIndex = 0;
         turnIndex = Random.Range(0, turnOrder.Count);
 
         pendingDraw = 0;
@@ -108,11 +108,11 @@ public class GameSession : NetworkBehaviour
 
         currentTurn = GetCurrentTurn();
 
-        Server_RecalcHandCounts();
-        Server_BroadcastPublicState();
-
         foreach (var pid in turnOrder)
             Target_SetHand(pid, hands[pid].ToArray());
+
+        Server_RecalcHandCounts();
+        Server_BroadcastPublicState();
     }
 
     [ServerRpc(requireOwnership: false)]
@@ -134,6 +134,15 @@ public class GameSession : NetworkBehaviour
 
         topCard = card;
         discardPile.Push(card);
+
+        int seatIndex = -1;
+        if (PlayerAvatar.allPlayers.TryGetValue(pid, out var avatar))
+            seatIndex = avatar.SeatIndex;
+
+        int pileIndex = discardPile.Count - 1;
+        int seed = Random.Range(int.MinValue, int.MaxValue);
+
+        Observers_CardPlayed(seatIndex, card, 1, pileIndex, seed);
 
         int steps = 1;
 
@@ -224,6 +233,16 @@ public class GameSession : NetworkBehaviour
 
         for (int i = 0; i < count; i++)
             discardPile.Push(prototype);
+
+        int seatIndex = -1;
+        if (PlayerAvatar.allPlayers.TryGetValue(pid, out var avatar))
+            seatIndex = avatar.SeatIndex;
+
+        int pileStartIndex = discardPile.Count - count;
+        int seed = Random.Range(int.MinValue, int.MaxValue);
+
+        Observers_CardPlayed(seatIndex, prototype, count, pileStartIndex, seed);
+
 
         topCard = prototype;
 
@@ -384,6 +403,12 @@ public class GameSession : NetworkBehaviour
     }
 
     [ObserversRpc]
+    private void Observers_CardPlayed(int seatIndex, CardId card, int count, int pileStartIndex, int seed)
+    {
+        PileThrowController.Instance?.PlayThrow(seatIndex, card, count, pileStartIndex, seed);
+    }
+
+    [ObserversRpc]
     private void Observers_PublicStateChanged(
         CardId newTopCard,
         PlayerID newCurrentTurn,
@@ -401,7 +426,7 @@ public class GameSession : NetworkBehaviour
     )
     {
         topCard = newTopCard;
-        TopCardView.Instance?.SetCard(topCard);
+        TopCardView.Instance?.SetCard(topCard, onlyIfUnset: true);
 
         currentTurn = newCurrentTurn;
         direction = newDirection;

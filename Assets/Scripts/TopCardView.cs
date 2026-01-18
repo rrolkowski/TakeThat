@@ -7,15 +7,21 @@ public class TopCardView : MonoBehaviour
     [SerializeField] private CardSpriteDB spriteDb;
     [SerializeField] private SpriteRenderer sr;
 
+    private bool locked;
+
     private void Awake()
     {
         Instance = this;
         if (sr == null) sr = GetComponent<SpriteRenderer>();
     }
-
-    public void SetCard(CardId card)
+    public void SetCard(CardId card, bool onlyIfUnset)
     {
+        if (locked && onlyIfUnset) return;
         if (sr == null || spriteDb == null) return;
+
         sr.sprite = spriteDb.GetSprite(card);
+
+        if (onlyIfUnset) locked = true;
     }
+
 }

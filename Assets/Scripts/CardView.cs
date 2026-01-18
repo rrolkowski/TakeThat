@@ -51,6 +51,11 @@ public class CardView : MonoBehaviour
         if (GameSession.Instance == null) return;
         if (!GameSession.Instance.IsMyTurn()) return;
 
+        if (PileThrowController.Instance != null)
+        {
+            PileThrowController.Instance.NotifyLocalClick(Card, transform);
+        }
+
         if (Card.type == CardType.Number && LocalHandView.Instance != null)
         {
             int copies = LocalHandView.Instance.CountCopiesInHand(Card);
@@ -122,5 +127,4 @@ public class CardView : MonoBehaviour
         transform.localRotation = baseRot;
         transform.localScale = baseScale;
     }
-
 }
