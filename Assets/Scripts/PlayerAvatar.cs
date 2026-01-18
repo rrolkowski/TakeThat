@@ -27,6 +27,18 @@ public class PlayerAvatar : PlayerIdentity<PlayerAvatar>
 
     public void Server_SetSteamId(ulong id) => steamId.value = id;
 
+    protected override void OnSpawned(bool asServer)
+    {
+        if (asServer) return;
+
+#if STEAMWORKS_NET_PACKAGE && !DISABLESTEAMWORKS
+    var steamId = Steamworks.SteamUser.GetSteamID().m_SteamID;
+    var name = Steamworks.SteamFriends.GetPersonaName();
+
+    Server_SetSteamData(steamId, name);
+#endif
+    }
+
     [ServerRpc(requireOwnership: false)]
     public void Server_SetSteamData(ulong id, string name, RPCInfo info = default)
     {

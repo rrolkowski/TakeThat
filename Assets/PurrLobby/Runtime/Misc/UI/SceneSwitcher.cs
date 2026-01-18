@@ -11,6 +11,9 @@ namespace PurrLobby
 
         public void SwitchScene()
         {
+            var holder = FindFirstObjectByType<LobbyDataHolder>();
+            holder?.SnapshotExpectedFromCurrentLobby();
+
             lobbyManager.SetLobbyStarted();
             SceneManager.LoadSceneAsync(nextScene);
         }
