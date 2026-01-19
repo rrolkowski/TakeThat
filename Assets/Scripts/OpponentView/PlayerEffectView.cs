@@ -9,7 +9,7 @@ public class PlayerEffectView : MonoBehaviour
     [Header("World seat points (Seat1..Seat4)")]
     [SerializeField] private Transform[] worldSeatPoints;
 
-    [Header("Effect anchors (you place these in inspector)")]
+    [Header("Effect anchors (children of Camera/LocalTableUI)")]
     [SerializeField] private Transform effectLeft;
     [SerializeField] private Transform effectTop;
     [SerializeField] private Transform effectRight;

@@ -13,7 +13,8 @@ public class GameOverPopup : MonoBehaviour
     [SerializeField] private TMP_Text titleText;
     [SerializeField] private Image avatarImage;
     [SerializeField] private Button resetButton;
-    [SerializeField] private Button lobbyButton;
+    [SerializeField] private GameObject lobbyButtonClient;
+    [SerializeField] private GameObject lobbyButtonHost;
     [SerializeField] private TMP_Text resetVotesText;
 
 
@@ -39,6 +40,10 @@ public class GameOverPopup : MonoBehaviour
             titleText.text = $"{winnerName}";
 
         currentSteamId = steamId;
+        bool isHost = NetworkManager.main != null && NetworkManager.main.isServer;
+
+        if (lobbyButtonClient != null) lobbyButtonClient.SetActive(!isHost);
+        if (lobbyButtonHost != null) lobbyButtonHost.SetActive(isHost);
 
         if (avatarImage != null)
         {
@@ -55,6 +60,10 @@ public class GameOverPopup : MonoBehaviour
                 avatarImage.enabled = true;
             }
         }
+
+        votedReset = false;
+        if (resetButton != null)
+            resetButton.Select();
     }
     public void OnResetVoteClicked()
     {
@@ -62,6 +71,7 @@ public class GameOverPopup : MonoBehaviour
         GameSession.Instance?.Server_VoteReset(votedReset);
     }
     public void OnLobbyClicked() => GameSession.Instance.Server_ReturnToLobby();
+    public void OnLeaveCliced() => UnityEngine.SceneManagement.SceneManager.LoadScene("LobbySample");
 
     public void Hide()
     {

@@ -7,16 +7,24 @@ public class PileThrowController : MonoBehaviour
 
     [Header("Scene refs")]
     [SerializeField] private Transform pileAnchor;
-    [SerializeField] private Transform[] seatThrowOrigins;
     [SerializeField] private PileView pileView;
     [SerializeField] private CardSpriteDB spriteDb;
     [SerializeField] private PileCardVisual flyingCardPrefab;
+
+    [Header("World-space UI anchors (children of camera)")]
+    [SerializeField] private Transform uiBottom;
+    [SerializeField] private Transform uiLeft;
+    [SerializeField] private Transform uiTop;
+    [SerializeField] private Transform uiRight;
 
     [Header("Throw motion")]
     [SerializeField] private float throwDuration = 0.35f;
     [SerializeField] private float arcHeight = 1.2f;
     [SerializeField] private float extraSpinDegrees = 180f;
     [SerializeField] private float perCardDelayMany = 0.07f;
+
+    [Header("Arc direction")]
+    [SerializeField] private bool arcUsesCameraUp = true;
 
     private PendingStart pending;
 
@@ -56,7 +64,7 @@ public class PileThrowController : MonoBehaviour
             Quaternion startRot;
             Vector3 startScale;
 
-            if (TryGetLocalStartOverride(seatIndex, card, out var p, out var r, out var s) && i == 0)
+            if (i == 0 && TryGetLocalStartOverride(seatIndex, card, out var p, out var r, out var s))
             {
                 startPos = p;
                 startRot = r;
@@ -64,19 +72,46 @@ public class PileThrowController : MonoBehaviour
             }
             else
             {
-                var origin = GetSeatOrigin(seatIndex);
+                Transform origin = GetUiOriginForSeat(seatIndex);
+                if (origin == null) return;
+
                 startPos = origin.position;
                 startRot = origin.rotation;
                 startScale = origin.lossyScale;
             }
 
             StartCoroutine(ThrowRoutine(startPos, startRot, startScale, card, pileIndex, cardSeed, i * perCardDelayMany));
-
         }
     }
 
-    private IEnumerator ThrowRoutine(Vector3 startPos, Quaternion startRot, Vector3 startScale, CardId card, int pileIndex, int seed, float delay)
-    { 
+    private Transform GetUiOriginForSeat(int seatIndex)
+    {
+        if (!PlayerAvatar.TryGetLocal(out var local) || local == null)
+        {
+            return null;
+        }
+
+        int relative = (seatIndex - local.SeatIndex + 4) % 4;
+
+        return relative switch
+        {
+            0 => uiBottom,
+            1 => uiLeft,
+            2 => uiTop,
+            3 => uiRight,
+            _ => null
+        };
+    }
+
+    private IEnumerator ThrowRoutine(
+        Vector3 startPos,
+        Quaternion startRot,
+        Vector3 startScale,
+        CardId card,
+        int pileIndex,
+        int seed,
+        float delay)
+    {
         if (delay > 0f)
             yield return new WaitForSeconds(delay);
 
@@ -90,7 +125,11 @@ public class PileThrowController : MonoBehaviour
         Vector3 endPos = pileAnchor.position;
         Quaternion endRot = pileAnchor.rotation;
 
-        Vector3 mid = (startPos + endPos) * 0.5f + Vector3.up * arcHeight;
+        Vector3 arcDir = Vector3.up;
+        if (arcUsesCameraUp && Camera.main != null)
+            arcDir = Camera.main.transform.up;
+
+        Vector3 mid = (startPos + endPos) * 0.5f + arcDir * arcHeight;
 
         float t = 0f;
         float inv = throwDuration > 0.0001f ? (1f / throwDuration) : 1f;
@@ -100,8 +139,7 @@ public class PileThrowController : MonoBehaviour
             t += Time.deltaTime * inv;
             float u = Mathf.Clamp01(t);
 
-            Vector3 p = Bezier(startPos, mid, endPos, u);
-            fly.transform.position = p;
+            fly.transform.position = Bezier(startPos, mid, endPos, u);
 
             Quaternion baseRot = Quaternion.Slerp(startRot, endRot, u);
             Quaternion spin = Quaternion.Euler(0f, 0f, Mathf.Lerp(0f, extraSpinDegrees, u));
@@ -114,20 +152,8 @@ public class PileThrowController : MonoBehaviour
 
         pileView.AddCard(card, pileIndex, seed);
 
-
         if (pending.active && SameCard(pending.card, card))
             pending.active = false;
-    }
-
-    private Transform GetSeatOrigin(int seatIndex)
-    {
-        if (seatThrowOrigins == null || seatThrowOrigins.Length == 0)
-            return pileAnchor;
-
-        if (seatIndex < 0 || seatIndex >= seatThrowOrigins.Length || seatThrowOrigins[seatIndex] == null)
-            return seatThrowOrigins[0] != null ? seatThrowOrigins[0] : pileAnchor;
-
-        return seatThrowOrigins[seatIndex];
     }
 
     private bool TryGetLocalStartOverride(int seatIndex, CardId card, out Vector3 pos, out Quaternion rot, out Vector3 scale)
@@ -156,7 +182,6 @@ public class PileThrowController : MonoBehaviour
         scale = pending.scale;
         return true;
     }
-
 
     private static Vector3 Bezier(Vector3 a, Vector3 b, Vector3 c, float t)
     {

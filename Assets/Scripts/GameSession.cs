@@ -34,7 +34,7 @@ public class GameSession : NetworkBehaviour
     [SerializeField] private float turnAdvanceDelay = 0.75f;
 
     [Header("Game Over")]
-
+    [SerializeField] private float gameOverPopupDelay = 0.75f;
     [SerializeField] private bool autoReturnToLobbyOnGameOver = false;
     
     private readonly HashSet<PlayerID> resetVotes = new();
@@ -83,10 +83,17 @@ public class GameSession : NetworkBehaviour
     private CardType lastEffectType;
     private int lastEffectValue;
 
+    private bool gameOverScheduled;
+    private float gameOverAt;
+    private string scheduledWinnerName;
+    private ulong scheduledWinnerSteamId;
+    private bool clientGameOver;
+    public bool IsGameOverClient => clientGameOver;
+
+
     private int clientLastEffectId;
     private int clientPendingDraw;
     private bool clientReactionActive;
-
 
     private void Awake()
     {
@@ -171,6 +178,11 @@ public class GameSession : NetworkBehaviour
         Server_CheckWin(pid);
         if (gameOver)
         {
+            if (NetworkManager.main != null && NetworkManager.main.isServer)
+                clientGameOver = true;
+
+            Observers_GameOverStart();
+
             Target_SetHand(pid, hand.ToArray());
             Server_RecalcHandCounts();
             Server_BroadcastPublicState();
@@ -392,7 +404,6 @@ public class GameSession : NetworkBehaviour
         var nm = NetworkManager.main;
         if (nm == null || !nm.isServer) return;
 
-        // tylko host (seat 0) mo¿e to wywo³aæ
         if (!PlayerAvatar.allPlayers.TryGetValue(info.sender, out var av) || av.SeatIndex != 0)
             return;
 
@@ -460,11 +471,18 @@ public class GameSession : NetworkBehaviour
             Server_RecalcHandCounts();
             Server_BroadcastPublicState();
         }
+
+        if (gameOverScheduled && Time.time >= gameOverAt)
+        {
+            gameOverScheduled = false;
+            Observers_GameOver(winnerPid, scheduledWinnerName, scheduledWinnerSteamId);
+        }
     }
 
     [ObserversRpc]
     private void Observers_MatchReset()
     {
+        clientGameOver = false;
         GameOverPopup.Instance?.Hide();
         PileView.Instance.Clear();
         TopCardView.Instance?.Clear(clearSprite: false);
@@ -475,6 +493,14 @@ public class GameSession : NetworkBehaviour
     {
         GameOverPopup.Instance?.Show(winner, winnerName, winnerSteamId);
     }
+
+    [ObserversRpc]
+    private void Observers_GameOverStart()
+    {
+        clientGameOver = true;
+        DrawPileIndicator.Instance?.SetVisible(false);
+    }
+
 
     [ObserversRpc]
     private void Observers_ReturnToLobby()
@@ -690,6 +716,7 @@ public class GameSession : NetworkBehaviour
 
         if (hand.Count == 0)
         {
+            Observers_GameOverStart();
             resetVotes.Clear();
             Server_BroadcastResetVotes();
             gameOver = true;
@@ -709,7 +736,10 @@ public class GameSession : NetworkBehaviour
                 steamId = avatar.SteamId;
             }
 
-            Observers_GameOver(pid, name, steamId);
+            gameOverScheduled = true;
+            gameOverAt = Time.time + gameOverPopupDelay;
+            scheduledWinnerName = name;
+            scheduledWinnerSteamId = steamId;
 
             if (autoReturnToLobbyOnGameOver)
                 Server_ReturnToLobby();

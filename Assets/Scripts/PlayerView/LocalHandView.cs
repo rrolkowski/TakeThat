@@ -34,6 +34,12 @@ public class LocalHandView : MonoBehaviour
         if (DrawPileIndicator.Instance == null || GameSession.Instance == null)
             return;
 
+        if (GameSession.Instance.IsGameOverClient)
+        {
+            DrawPileIndicator.Instance?.SetVisible(false);
+            return;
+        }
+
         if (!GameSession.Instance.IsMyTurn())
         {
             DrawPileIndicator.Instance.SetVisible(false);
