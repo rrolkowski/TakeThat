@@ -879,6 +879,7 @@ GameObject:
   - component: {fileID: 1603122539}
   - component: {fileID: 1603122537}
   - component: {fileID: 1603122536}
+  - component: {fileID: 1603122540}
   m_Layer: 5
   m_Name: Return
   m_TagString: Untagged
@@ -1013,6 +1014,22 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   scene: LobbySample
+--- !u!114 &1603122540
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1603122534}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e43f85a58a1f2ca44ab6c67d19a76f3e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::UiButtonAudioSfx
+  playHighlightOnHover: 1
+  playHighlightOnSelect: 1
+  highlightCooldown: 0.05
+  clickSound: 0
 --- !u!1 &1657337480
 GameObject:
   m_ObjectHideFlags: 0

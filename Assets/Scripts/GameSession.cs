@@ -1,4 +1,4 @@
-using PurrNet;
+﻿using PurrNet;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -36,7 +36,19 @@ public class GameSession : NetworkBehaviour
     [Header("Game Over")]
     [SerializeField] private float gameOverPopupDelay = 0.75f;
     [SerializeField] private bool autoReturnToLobbyOnGameOver = false;
-    
+
+    // ========= EVENTS (audio/vfx/etc). Każdy klient słyszy wszystko =========
+    public static event Action<int, CardId, int> OnCardPlayedClient; // seatIndex, card, count
+    public static event Action<int, int> OnCardsDrawnClient;         // seatIndex, count
+    public static event Action<int> OnTurnStartedClient;             // seatIndex
+    public static event Action<int> OnTurnTimedOutClient;            // seatIndex
+    public static event Action<int> OnGameOverClient;                // winnerSeatIndex (dla SFX)
+
+    // cache dla wykrycia startu tury na kliencie
+    private bool clientHasPublicState;
+    private PlayerID clientLastTurnPid;
+    private bool clientLastTurnTransition;
+
     private readonly HashSet<PlayerID> resetVotes = new();
 
     private readonly Dictionary<PlayerID, List<CardId>> hands = new();
@@ -89,7 +101,6 @@ public class GameSession : NetworkBehaviour
     private ulong scheduledWinnerSteamId;
     private bool clientGameOver;
     public bool IsGameOverClient => clientGameOver;
-
 
     private int clientLastEffectId;
     private int clientPendingDraw;
@@ -146,7 +157,6 @@ public class GameSession : NetworkBehaviour
         currentTurn = GetCurrentTurn();
         Server_StartTurnTimer();
 
-
         foreach (var pid in turnOrder)
             Target_SetHand(pid, hands[pid].ToArray());
 
@@ -158,9 +168,7 @@ public class GameSession : NetworkBehaviour
     public void Server_RequestPlay(CardId card, RPCInfo info = default)
     {
         if (!started) return;
-
         if (gameOver) return;
-
         if (advanceScheduled) return;
 
         var pid = info.sender;
@@ -181,7 +189,8 @@ public class GameSession : NetworkBehaviour
             if (NetworkManager.main != null && NetworkManager.main.isServer)
                 clientGameOver = true;
 
-            Observers_GameOverStart();
+            int winnerSeat = GetSeatIndexForPid(winnerPid);
+            Observers_GameOverStart(winnerSeat);
 
             Target_SetHand(pid, hand.ToArray());
             Server_RecalcHandCounts();
@@ -192,9 +201,7 @@ public class GameSession : NetworkBehaviour
         topCard = card;
         discardPile.Push(card);
 
-        int seatIndex = -1;
-        if (PlayerAvatar.allPlayers.TryGetValue(pid, out var avatar))
-            seatIndex = avatar.SeatIndex;
+        int seatIndex = GetSeatIndexForPid(pid);
 
         int pileIndex = discardPile.Count - 1;
         int seed = Random.Range(int.MinValue, int.MaxValue);
@@ -255,9 +262,7 @@ public class GameSession : NetworkBehaviour
     public void Server_RequestPlayMany(CardId prototype, int count, RPCInfo info = default)
     {
         if (!started) return;
-
         if (gameOver) return;
-
         if (advanceScheduled) return;
 
         var pid = info.sender;
@@ -269,7 +274,6 @@ public class GameSession : NetworkBehaviour
             return;
 
         if (prototype.type != CardType.Number) return;
-
         if (!IsPlayable(prototype)) return;
 
         if (!hands.TryGetValue(pid, out var hand)) return;
@@ -303,15 +307,12 @@ public class GameSession : NetworkBehaviour
         for (int i = 0; i < count; i++)
             discardPile.Push(prototype);
 
-        int seatIndex = -1;
-        if (PlayerAvatar.allPlayers.TryGetValue(pid, out var avatar))
-            seatIndex = avatar.SeatIndex;
+        int seatIndex = GetSeatIndexForPid(pid);
 
         int pileStartIndex = discardPile.Count - count;
         int seed = Random.Range(int.MinValue, int.MaxValue);
 
         Observers_CardPlayed(seatIndex, prototype, count, pileStartIndex, seed);
-
 
         topCard = prototype;
 
@@ -323,14 +324,11 @@ public class GameSession : NetworkBehaviour
         Target_SetHand(pid, hand.ToArray());
     }
 
-
     [ServerRpc(requireOwnership: false)]
     public void Server_RequestDraw(RPCInfo info = default)
     {
         if (!started) return;
-
         if (gameOver) return;
-
         if (advanceScheduled) return;
 
         var pid = info.sender;
@@ -359,6 +357,10 @@ public class GameSession : NetworkBehaviour
         }
 
         hand.Add(Server_DrawCard());
+
+        int seatIndex = GetSeatIndexForPid(pid);
+        if (seatIndex >= 0)
+            Observers_CardsDrawn(seatIndex, 1);
 
         Server_ScheduleAdvanceTurn(steps: 1);
 
@@ -440,7 +442,6 @@ public class GameSession : NetworkBehaviour
         }
     }
 
-
     private void Update()
     {
         if (NetworkManager.main == null || !NetworkManager.main.isServer) return;
@@ -494,13 +495,15 @@ public class GameSession : NetworkBehaviour
         GameOverPopup.Instance?.Show(winner, winnerName, winnerSteamId);
     }
 
+    // Zmienione: do Observers idzie winnerSeatIndex (żeby SFX mogło panować)
     [ObserversRpc]
-    private void Observers_GameOverStart()
+    private void Observers_GameOverStart(int winnerSeatIndex)
     {
         clientGameOver = true;
         DrawPileIndicator.Instance?.SetVisible(false);
-    }
 
+        OnGameOverClient?.Invoke(winnerSeatIndex);
+    }
 
     [ObserversRpc]
     private void Observers_ReturnToLobby()
@@ -512,6 +515,20 @@ public class GameSession : NetworkBehaviour
     private void Observers_CardPlayed(int seatIndex, CardId card, int count, int pileStartIndex, int seed)
     {
         PileThrowController.Instance?.PlayThrow(seatIndex, card, count, pileStartIndex, seed);
+
+        OnCardPlayedClient?.Invoke(seatIndex, card, count);
+    }
+
+    [ObserversRpc]
+    private void Observers_CardsDrawn(int seatIndex, int count)
+    {
+        OnCardsDrawnClient?.Invoke(seatIndex, count);
+    }
+
+    [ObserversRpc]
+    private void Observers_TurnTimedOut(int seatIndex)
+    {
+        OnTurnTimedOutClient?.Invoke(seatIndex);
     }
 
     [ObserversRpc]
@@ -532,7 +549,6 @@ public class GameSession : NetworkBehaviour
         float turnTimeLeft,
         float turnSeconds,
         bool turnTransition
-
     )
     {
         topCard = newTopCard;
@@ -545,8 +561,6 @@ public class GameSession : NetworkBehaviour
         clientPendingDraw = pending;
         clientReactionActive = reactionActive;
         clientTurnTransition = turnTransition;
-
-        //Debug.Log($"[Public] Top Card: {topCard} | Turn: {currentTurn} | Dir: {direction} | pendingDraw={pendingDraw}");
 
         if (PlayerAvatar.allPlayers.TryGetValue(currentTurn, out var avatar))
             TurnIndicator.Instance?.SetTarget(avatar.transform);
@@ -578,7 +592,32 @@ public class GameSession : NetworkBehaviour
         {
             LocalHandView.Instance?.RefreshDrawIndicator();
         }
+
+        // ========= TURN START (global) =========
+        // Chcemy odpalić, kiedy tura "staje się aktywna":
+        // - albo transition z true -> false
+        // - albo zmiana currentTurn bez transition (bezpieczne)
+        if (!clientHasPublicState)
+        {
+            clientHasPublicState = true;
+        }
+        else
+        {
+            bool becameActive = clientLastTurnTransition && !turnTransition;
+            bool changedWhileActive = !turnTransition && newCurrentTurn != clientLastTurnPid;
+
+            if (becameActive || changedWhileActive)
+            {
+                int seatIndex = GetSeatIndexForPid(newCurrentTurn);
+                if (seatIndex >= 0)
+                    OnTurnStartedClient?.Invoke(seatIndex);
+            }
+        }
+
+        clientLastTurnPid = newCurrentTurn;
+        clientLastTurnTransition = turnTransition;
     }
+
     private void Server_BroadcastPublicState()
     {
         var pids = turnOrder.ToArray();
@@ -641,6 +680,10 @@ public class GameSession : NetworkBehaviour
 
         if (actuallyDrew > 0)
         {
+            int seatIndex = GetSeatIndexForPid(currentTurn);
+            if (seatIndex >= 0)
+                Observers_CardsDrawn(seatIndex, actuallyDrew);
+
             lastEffectId++;
             lastEffectTarget = currentTurn;
             lastEffectType = CardType.Draw3;
@@ -675,6 +718,11 @@ public class GameSession : NetworkBehaviour
         if (!started) return;
 
         var pid = currentTurn;
+
+        int seatIndex = GetSeatIndexForPid(pid);
+        if (seatIndex >= 0)
+            Observers_TurnTimedOut(seatIndex);
+
         if (draw3ReactionActive && pendingDraw > 0 && pendingType == CardType.Draw3)
         {
             Server_ResolvePendingDraw3_KeepTurn();
@@ -688,6 +736,10 @@ public class GameSession : NetworkBehaviour
                 {
                     hand.Add(Server_DrawCard());
                     Target_SetHand(pid, hand.ToArray());
+
+                    // timeout też dobiera kartę -> też globalny draw sfx
+                    if (seatIndex >= 0)
+                        Observers_CardsDrawn(seatIndex, 1);
                 }
             }
 
@@ -716,7 +768,6 @@ public class GameSession : NetworkBehaviour
 
         if (hand.Count == 0)
         {
-            Observers_GameOverStart();
             resetVotes.Clear();
             Server_BroadcastResetVotes();
             gameOver = true;
@@ -735,6 +786,10 @@ public class GameSession : NetworkBehaviour
                 name = avatar.DisplayName;
                 steamId = avatar.SteamId;
             }
+
+            // najpierw start (SFX + ukrycia UI)
+            int winnerSeat = GetSeatIndexForPid(pid);
+            Observers_GameOverStart(winnerSeat);
 
             gameOverScheduled = true;
             gameOverAt = Time.time + gameOverPopupDelay;
@@ -761,7 +816,6 @@ public class GameSession : NetworkBehaviour
     {
         GameOverPopup.Instance?.SetResetVotes(votes, total, voters);
     }
-
 
     private CardId Server_DrawCard()
     {
@@ -811,6 +865,13 @@ public class GameSession : NetworkBehaviour
             hand.Add(Server_DrawCard());
 
         Target_SetHand(pid, hand.ToArray());
+
+        if (toAdd > 0)
+        {
+            int seatIndex = GetSeatIndexForPid(pid);
+            if (seatIndex >= 0)
+                Observers_CardsDrawn(seatIndex, toAdd);
+        }
     }
 
     private void Server_BuildDeck()
@@ -877,6 +938,7 @@ public class GameSession : NetworkBehaviour
             }
         }
     }
+
     private void Server_FlipTop_NoSpecialsOnStart()
     {
         if (drawPile.Count == 0)
@@ -914,6 +976,7 @@ public class GameSession : NetworkBehaviour
         topCard = chosen;
         discardPile.Push(topCard);
     }
+
     private PlayerID GetCurrentTurn()
     {
         if (turnOrder.Count == 0) return default;
@@ -963,6 +1026,13 @@ public class GameSession : NetworkBehaviour
 
             return clientTurnTransition;
         }
+    }
+
+    private int GetSeatIndexForPid(PlayerID pid)
+    {
+        if (PlayerAvatar.allPlayers.TryGetValue(pid, out var avatar) && avatar != null)
+            return avatar.SeatIndex;
+        return -1;
     }
 
     private static void Shuffle(List<CardId> list)

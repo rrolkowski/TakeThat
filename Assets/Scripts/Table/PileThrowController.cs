@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 
 public class PileThrowController : MonoBehaviour
@@ -203,4 +203,18 @@ public class PileThrowController : MonoBehaviour
         public Vector3 scale;
         public float time;
     }
+
+    [Tooltip("Zwraca pozycję świata, z której powinien grać 3D audio dla danego seatIndex.")]
+    public bool TryGetAudioWorldPos(int seatIndex, out Vector3 pos)
+    {
+        pos = default;
+
+        Transform origin = GetUiOriginForSeat(seatIndex);
+        if (origin == null) return false;
+
+        pos = origin.position;
+        return true;
+    }
+
+
 }

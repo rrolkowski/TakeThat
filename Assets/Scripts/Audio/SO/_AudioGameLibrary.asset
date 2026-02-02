@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ddf73ef3d8d65b441a6e21cf12188863, type: 3}
+  m_Name: _AudioGameLibrary
+  m_EditorClassIdentifier: Assembly-CSharp::AudioGameLibrarySO
+  gameLoop:
+    clip: {fileID: 8300000, guid: 1ea60b21bf59ecd43a4ae83dcf6ad37d, type: 3}
+    volume: 0.01
+    loop: 1
+  playCardFromHand:
+    clips:
+    - {fileID: 8300000, guid: da651fbd4ba57e446ab36406710a4dff, type: 3}
+    volume: 1
+    pitchMin: 1
+    pitchMax: 1
+  drawCard:
+    clips:
+    - {fileID: 8300000, guid: d7ce78416593e5747b6aa9558731896e, type: 3}
+    volume: 1
+    pitchMin: 1
+    pitchMax: 1
+  yourTurnStart:
+    clips:
+    - {fileID: 8300000, guid: 494238ae59459b5479e6f5da822f8ef1, type: 3}
+    volume: 1
+    pitchMin: 1
+    pitchMax: 1
+  yourTurnTimeout:
+    clips:
+    - {fileID: 8300000, guid: 93fd029a816cfe345818e18b8194b631, type: 3}
+    volume: 1
+    pitchMin: 1
+    pitchMax: 1
+  throwBlockCard:
+    clips:
+    - {fileID: 8300000, guid: 96340438f19e3bd49b1619ce44421a93, type: 3}
+    volume: 1
+    pitchMin: 1
+    pitchMax: 1
+  throwPlusCard:
+    clips:
+    - {fileID: 8300000, guid: 234ded1d196e291488c2eb0605ca2902, type: 3}
+    volume: 1
+    pitchMin: 1
+    pitchMax: 1
+  gameEndWinner:
+    clips:
+    - {fileID: 8300000, guid: 271370f5a9b89a74881d0fd005b22900, type: 3}
+    volume: 1
+    pitchMin: 1
+    pitchMax: 1
