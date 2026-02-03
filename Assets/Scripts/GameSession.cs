@@ -9,7 +9,7 @@ public class GameSession : NetworkBehaviour
 {
     public static GameSession Instance { get; private set; }
 
-    [SerializeField] private string lobbySceneName = "LobbyScene";
+    [SerializeField] private string lobbySceneName = "LobbySample";
 
     [Header("Rules")]
     [SerializeField] private int initialHandSize = 7;
@@ -181,46 +181,54 @@ public class GameSession : NetworkBehaviour
 
         if (!IsPlayable(card)) return;
 
+        // zdejmujemy kartę z ręki
         hand.RemoveAt(idx);
 
-        Server_CheckWin(pid);
-        if (gameOver)
-        {
-            if (NetworkManager.main != null && NetworkManager.main.isServer)
-                clientGameOver = true;
+        // czy to była ostatnia karta?
+        bool willWin = (hand.Count == 0);
 
-            int winnerSeat = GetSeatIndexForPid(winnerPid);
-            Observers_GameOverStart(winnerSeat);
-
-            Target_SetHand(pid, hand.ToArray());
-            Server_RecalcHandCounts();
-            Server_BroadcastPublicState();
-            return;
-        }
-
+        // ===== ZAWSZE: zagraj kartę na discard + animacja rzutu =====
         topCard = card;
         discardPile.Push(card);
 
         int seatIndex = GetSeatIndexForPid(pid);
-
         int pileIndex = discardPile.Count - 1;
         int seed = Random.Range(int.MinValue, int.MaxValue);
 
         Observers_CardPlayed(seatIndex, card, 1, pileIndex, seed);
 
+        // od razu aktualizujemy rękę i stan publiczny (żeby wszyscy widzieli topCard i liczniki)
+        Target_SetHand(pid, hand.ToArray());
+        Server_RecalcHandCounts();
+        Server_BroadcastPublicState();
+
+        // ===== jeśli to była ostatnia karta: NIE wykonuj efektu =====
+        if (willWin)
+        {
+            Server_CheckWin(pid);
+
+            // (opcjonalnie, ale polecam) jeszcze raz broadcast po ustawieniu gameOver/wygranej
+            Server_RecalcHandCounts();
+            Server_BroadcastPublicState();
+            return;
+        }
+
+        // ===== normalnie: efekty kart + przejście tury =====
         int steps = 1;
 
         switch (card.type)
         {
             case CardType.Skip:
-                var target = PeekNextPlayer(1);
-                lastEffectId++;
-                lastEffectTarget = target;
-                lastEffectType = CardType.Skip;
-                lastEffectValue = 0;
+                {
+                    var target = PeekNextPlayer(1);
+                    lastEffectId++;
+                    lastEffectTarget = target;
+                    lastEffectType = CardType.Skip;
+                    lastEffectValue = 0;
 
-                steps = 2;
-                break;
+                    steps = 2;
+                    break;
+                }
 
             case CardType.Reverse:
                 direction *= -1;
@@ -254,9 +262,8 @@ public class GameSession : NetworkBehaviour
 
         Server_RecalcHandCounts();
         Server_BroadcastPublicState();
-
-        Target_SetHand(pid, hand.ToArray());
     }
+
 
     [ServerRpc(requireOwnership: false)]
     public void Server_RequestPlayMany(CardId prototype, int count, RPCInfo info = default)
@@ -295,34 +302,43 @@ public class GameSession : NetworkBehaviour
             }
         }
 
-        Server_CheckWin(pid);
-        if (gameOver)
-        {
-            Target_SetHand(pid, hand.ToArray());
-            Server_RecalcHandCounts();
-            Server_BroadcastPublicState();
-            return;
-        }
+        // czy to była ostatnia karta?
+        bool willWin = (hand.Count == 0);
 
+        // ===== ZAWSZE: discard + animacja rzutu =====
         for (int i = 0; i < count; i++)
             discardPile.Push(prototype);
 
-        int seatIndex = GetSeatIndexForPid(pid);
+        topCard = prototype;
 
+        int seatIndex = GetSeatIndexForPid(pid);
         int pileStartIndex = discardPile.Count - count;
         int seed = Random.Range(int.MinValue, int.MaxValue);
 
         Observers_CardPlayed(seatIndex, prototype, count, pileStartIndex, seed);
 
-        topCard = prototype;
+        Target_SetHand(pid, hand.ToArray());
+        Server_RecalcHandCounts();
+        Server_BroadcastPublicState();
 
+        // ===== jeśli to była ostatnia karta: NIE rób nic więcej =====
+        if (willWin)
+        {
+            Server_CheckWin(pid);
+
+            // (opcjonalnie, ale polecam) broadcast po ustawieniu gameOver
+            Server_RecalcHandCounts();
+            Server_BroadcastPublicState();
+            return;
+        }
+
+        // numbers-only, więc bez efektów — tylko przejście tury
         Server_ScheduleAdvanceTurn(steps: 1);
 
         Server_RecalcHandCounts();
         Server_BroadcastPublicState();
-
-        Target_SetHand(pid, hand.ToArray());
     }
+
 
     [ServerRpc(requireOwnership: false)]
     public void Server_RequestDraw(RPCInfo info = default)

@@ -285,6 +285,13 @@ public class AudioManager : MonoBehaviour
         PlaySfx3D(gameLibrary.throwPlusCard, pos, isOtherPlayer ? OtherMul : 1f);
     }
 
+    public void ThrowReverseCardAt(Vector3 pos, bool isOtherPlayer)
+    {
+        if (gameLibrary == null) return;
+        PlaySfx3D(gameLibrary.throwReverseCard, pos, isOtherPlayer ? OtherMul : 1f);
+    }
+
+
     // GAME OVER (2D)
     public void GameEndWinner2D(bool isOtherPlayer)
     {

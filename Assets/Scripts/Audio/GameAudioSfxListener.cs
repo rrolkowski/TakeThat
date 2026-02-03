@@ -91,10 +91,13 @@ public class GameAudioSfxListener : MonoBehaviour
 
         if (card.type == CardType.Draw2 || card.type == CardType.Draw3)
             AudioManager.I.ThrowPlusCardAt(pos, isOther);
-        else if (card.type == CardType.Skip || card.type == CardType.Reverse)
+        else if (card.type == CardType.Reverse)
+            AudioManager.I.ThrowReverseCardAt(pos, isOther);
+        else if (card.type == CardType.Skip)
             AudioManager.I.ThrowBlockCardAt(pos, isOther);
         else
             AudioManager.I.PlayCardFromHandAt(pos, isOther);
+
     }
 
     private void OnCardsDrawn(int seatIndex, int count)

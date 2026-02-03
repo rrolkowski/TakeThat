@@ -8,9 +8,10 @@
         _Cutoff("Alpha Cutoff", Range(0,1)) = 0.25
         _Smoothness("Smoothness", Range(0,1)) = 0.1
         _SpecularStrength("Specular Strength", Range(0,2)) = 0.5
-
-        // dalej może się przydać do cieni (bias/slope), ale na światło już nie musisz tym kręcić
         _NormalSign("Normal Sign", Float) = 1.0
+
+        // Na Z-fighting w stosie (domyślnie 0 = wyłączone)
+        _DepthOffset("Depth Offset", Range(-0.01, 0.01)) = 0
     }
 
     SubShader
@@ -20,13 +21,14 @@
             "RenderPipeline"="UniversalPipeline"
             "RenderType"="TransparentCutout"
             "Queue"="AlphaTest"
+            "DisableBatching"="True"   // <<< KLUCZOWE: rozbija batching dla tego shadera
         }
 
         Cull Off
         ZWrite On
         ZTest LEqual
 
-        // ========= LIT (oświetlenie) =========
+        // ========= FORWARD LIT =========
         Pass
         {
             Name "ForwardLit"
@@ -55,6 +57,7 @@
                 float  _Smoothness;
                 float  _SpecularStrength;
                 float  _NormalSign;
+                float  _DepthOffset;
             CBUFFER_END
 
             struct Attributes
@@ -80,9 +83,12 @@
 
                 VertexPositionInputs pos = GetVertexPositionInputs(IN.positionOS.xyz);
                 OUT.positionCS = pos.positionCS;
+
+                // opcjonalny anti z-fight
+                OUT.positionCS.z += _DepthOffset * OUT.positionCS.w;
+
                 OUT.positionWS = pos.positionWS;
 
-                // normal bazowy dla sprite’a (płaszczyzna w -Z); dwustronność zrobimy w frag przez abs(dot)
                 float3 normalOS = float3(0, 0, -1) * _NormalSign;
                 OUT.normalWS = normalize(TransformObjectToWorldNormal(normalOS));
 
@@ -102,7 +108,6 @@
                 return s.xxx;
             }
 
-            // dwustronny spec: licz dla N i -N i bierz mocniejszy
             float3 SpecularTwoSided(float3 N, float3 V, float3 L, float smoothness, float strength)
             {
                 float3 s1 = SpecularBlinnPhong( N, V, L, smoothness, strength);
@@ -115,24 +120,22 @@
                 float4 tex = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uv);
                 float4 albedo = tex * IN.color;
 
+                // alpha cutout
                 clip(albedo.a - _Cutoff);
 
                 float3 N = normalize(IN.normalWS);
                 float3 V = normalize(GetWorldSpaceViewDir(IN.positionWS));
 
+                // (Nawet w Unlit ten shader nadal jest używany — różnice mogą wynikać z depth/batch, nie z light.)
                 float3 ambient = SampleSH(N);
 
                 float4 shadowCoord = TransformWorldToShadowCoord(IN.positionWS);
                 Light mainLight = GetMainLight(shadowCoord);
-
                 float3 Lm = normalize(mainLight.direction);
 
-                // ✅ DWUSTRONNY DIFFUSE
                 float ndl = abs(dot(N, Lm));
-
                 float3 diffuse = ndl * mainLight.color * mainLight.distanceAttenuation * mainLight.shadowAttenuation;
 
-                // ✅ DWUSTRONNY SPEC
                 float3 spec = SpecularTwoSided(N, V, Lm, _Smoothness, _SpecularStrength) * mainLight.color
                             * mainLight.distanceAttenuation * mainLight.shadowAttenuation;
 
@@ -144,10 +147,10 @@
                     float3 L = normalize(l.direction);
 
                     float ndl2 = abs(dot(N, L));
-
                     diffuse += ndl2 * l.color * l.distanceAttenuation * l.shadowAttenuation;
-                    spec    += SpecularTwoSided(N, V, L, _Smoothness, _SpecularStrength) * l.color
-                             * l.distanceAttenuation * l.shadowAttenuation;
+
+                    spec += SpecularTwoSided(N, V, L, _Smoothness, _SpecularStrength) * l.color
+                          * l.distanceAttenuation * l.shadowAttenuation;
                 }
                 #endif
 
@@ -159,7 +162,7 @@
             ENDHLSL
         }
 
-        // ========= SHADOW CASTER (rzucanie cieni) =========
+        // ========= SHADOW CASTER (prosty, bez tangentOS) =========
         Pass
         {
             Name "ShadowCaster"
@@ -173,10 +176,7 @@
             #pragma vertex vertSC
             #pragma fragment fragSC
 
-            #pragma multi_compile_vertex _ _CASTING_PUNCTUAL_LIGHT_SHADOW
-
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
-            #include "Packages/com.unity.render-pipelines.universal/Shaders/ShadowCasterPass.hlsl"
 
             TEXTURE2D(_MainTex);
             SAMPLER(sampler_MainTex);
@@ -185,7 +185,10 @@
                 float4 _MainTex_ST;
                 float4 _Color;
                 float  _Cutoff;
+                float  _Smoothness;
+                float  _SpecularStrength;
                 float  _NormalSign;
+                float  _DepthOffset;
             CBUFFER_END
 
             struct AttributesSC
@@ -208,11 +211,14 @@
                 OUT.uv = TRANSFORM_TEX(IN.uv, _MainTex);
                 OUT.color = IN.color * _Color;
 
-                Attributes a;
-                a.positionOS = IN.positionOS;
-                a.normalOS = float3(0, 0, -1) * _NormalSign;
+                float3 positionWS = TransformObjectToWorld(IN.positionOS.xyz);
 
-                OUT.positionCS = GetShadowPositionHClip(a);
+                // Unity w pass ShadowCaster ustawia macierze pod shadowmapę,
+                // więc TransformWorldToHClip działa jako "do shadow clip".
+                OUT.positionCS = TransformWorldToHClip(positionWS);
+
+                OUT.positionCS.z += _DepthOffset * OUT.positionCS.w;
+
                 return OUT;
             }
 

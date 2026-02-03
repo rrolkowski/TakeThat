@@ -17,6 +17,7 @@ public class AudioGameLibrarySO : ScriptableObject
     [Header("Special Cards SFX")]
     public AudioSfxDef throwBlockCard = new AudioSfxDef();
     public AudioSfxDef throwPlusCard = new AudioSfxDef();
+    public AudioSfxDef throwReverseCard = new AudioSfxDef();
 
     [Header("End Game")]
     public AudioSfxDef gameEndWinner = new AudioSfxDef();

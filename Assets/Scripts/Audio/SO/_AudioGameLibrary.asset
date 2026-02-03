@@ -52,6 +52,12 @@ MonoBehaviour:
     volume: 1
     pitchMin: 1
     pitchMax: 1
+  throwReverseCard:
+    clips:
+    - {fileID: 8300000, guid: 96340438f19e3bd49b1619ce44421a93, type: 3}
+    volume: 1
+    pitchMin: 1
+    pitchMax: 1
   gameEndWinner:
     clips:
     - {fileID: 8300000, guid: 271370f5a9b89a74881d0fd005b22900, type: 3}
