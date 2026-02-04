@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using UnityEngine;
 
 public class CardView : MonoBehaviour
@@ -43,7 +43,12 @@ public class CardView : MonoBehaviour
         anim = null;
 
         transform.localScale = baseScale;
-        if (hoverLockObject != null) hoverLockObject.SetActive(false);
+
+        if (hoverLockObject != null)
+            hoverLockObject.SetActive(false);
+
+        // jak odświeżasz rękę, to na wszelki wypadek ukryj UI jeśli to była ta karta
+        HoverCardInfoUI.Instance?.HideIfOwner(this);
     }
 
     public void OnClicked()
@@ -74,6 +79,9 @@ public class CardView : MonoBehaviour
         if (hoverLockObject != null)
             hoverLockObject.SetActive(true);
 
+        // pokaż opis karty w UI
+        HoverCardInfoUI.Instance?.Show(this);
+
         Vector3 liftDir = baseRot * Vector3.up;
         Vector3 targetPos = basePos + liftDir * hoverLift;
         Quaternion targetRot = straightenOnHover ? Quaternion.identity : baseRot;
@@ -85,6 +93,9 @@ public class CardView : MonoBehaviour
     {
         if (hoverLockObject != null)
             hoverLockObject.SetActive(false);
+
+        // schowaj UI jeśli to była ta karta
+        HoverCardInfoUI.Instance?.HideIfOwner(this);
 
         StartAnim(basePos, baseRot, baseScale, hoverOutSpeed);
     }
@@ -122,6 +133,9 @@ public class CardView : MonoBehaviour
 
         if (hoverLockObject != null)
             hoverLockObject.SetActive(false);
+
+        // schowaj UI jeśli ta karta była ownerem
+        HoverCardInfoUI.Instance?.HideIfOwner(this);
 
         transform.localPosition = basePos;
         transform.localRotation = baseRot;
