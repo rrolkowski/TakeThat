@@ -69,6 +69,13 @@ namespace PurrLobby
             {
                 if (_lobbyDataHolder.CurrentLobby.IsOwner)
                 {
+                    var steamTransportObj = _networkManager.transport;
+                    var steamTransportType = steamTransportObj.GetType();
+
+                    var addressProp = steamTransportType.GetProperty("address");
+                    if (addressProp != null)
+                        addressProp.SetValue(steamTransportObj, "localhost");
+
                     _networkManager.StartHost();
                     return;
                 }
