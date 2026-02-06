@@ -11,7 +11,7 @@ GameObject:
   - component: {fileID: 1249838855500926005}
   - component: {fileID: 7302151555064233695}
   - component: {fileID: 5525461693490672422}
-  m_Layer: 5
+  m_Layer: 9
   m_Name: Cards
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -147,7 +147,7 @@ GameObject:
   - component: {fileID: 4121528476356610892}
   - component: {fileID: 7117678901520710327}
   - component: {fileID: 6562326099071880724}
-  m_Layer: 5
+  m_Layer: 9
   m_Name: Name
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -284,7 +284,7 @@ GameObject:
   - component: {fileID: 5508441007945154399}
   - component: {fileID: 3416285528164442651}
   - component: {fileID: 3346509748978522996}
-  m_Layer: 5
+  m_Layer: 9
   m_Name: Canvas
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -387,7 +387,7 @@ GameObject:
   - component: {fileID: 2097215302386268013}
   - component: {fileID: 7083202201055980099}
   - component: {fileID: 5842572104055471439}
-  m_Layer: 5
+  m_Layer: 9
   m_Name: Icon
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -401,13 +401,13 @@ RectTransform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 6444910200771430581}
-  m_LocalRotation: {x: 0, y: 0, z: -1, w: 0}
+  m_LocalRotation: {x: -1, y: 0, z: -0, w: 0}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 0.5, y: 0.5, z: 0.5}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 4467379908440010213}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: -180}
+  m_LocalEulerAnglesHint: {x: 0, y: 180, z: -180}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
   m_AnchoredPosition: {x: -75, y: 50}
@@ -461,7 +461,7 @@ GameObject:
   m_Component:
   - component: {fileID: 786275679978280436}
   - component: {fileID: 8271797223437513709}
-  m_Layer: 0
+  m_Layer: 9
   m_Name: PlayerBadge
   m_TagString: Untagged
   m_Icon: {fileID: 0}
