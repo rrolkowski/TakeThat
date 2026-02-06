@@ -2,6 +2,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Unity.VisualScripting;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
@@ -436,10 +437,7 @@ public class GameSession : NetworkBehaviour
         pendingDraw = 0;
 
         Observers_ReturnToLobby();
-
-        if (nm != null && nm.isServer)
-            nm.StopServer();
-
+        if (nm) Destroy(nm.gameObject);
         nm.sceneModule.LoadSceneAsync(lobbySceneName);
     }
 

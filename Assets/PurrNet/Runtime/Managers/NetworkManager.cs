@@ -1701,9 +1701,12 @@ namespace PurrNet
                 {
                     case false:
                         _isCleaningClient = true;
+                        if (this) Destroy(gameObject);
+                        SceneManager.LoadSceneAsync("LobbySample");
                         break;
                     case true:
                         _isCleaningServer = true;
+                        if (this) Destroy(gameObject);
                         break;
                 }
             }

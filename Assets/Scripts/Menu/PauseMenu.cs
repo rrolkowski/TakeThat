@@ -93,11 +93,9 @@ public class PauseMenu : MonoBehaviour
     public void OnLeaveGameClicked()
     {
         var nm = NetworkManager.main;
-        if (nm != null && nm.isClient)
-            nm.StopClient();
-
         SetRaycastersEnabled(true);
-        SceneManager.LoadScene(lobbySceneName);
+        if(nm) Destroy(nm.gameObject);
+        SceneManager.LoadSceneAsync(lobbySceneName);
     }
 
     public void Resume()

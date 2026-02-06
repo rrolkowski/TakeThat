@@ -75,9 +75,9 @@ public class GameOverPopup : MonoBehaviour
     public void OnLeaveCliced()
     {
         var nm = NetworkManager.main;
-        if (nm != null && nm.isClient)
-            nm.StopClient();
-        SceneManager.LoadScene("LobbySample");
+
+        if(nm) Destroy(nm.gameObject);
+        SceneManager.LoadSceneAsync("LobbySample");
     }
 
     public void Hide()
