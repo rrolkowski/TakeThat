@@ -13,54 +13,62 @@ MonoBehaviour:
   m_Name: _AudioGameLibrary
   m_EditorClassIdentifier: Assembly-CSharp::AudioGameLibrarySO
   gameLoop:
-    clip: {fileID: 8300000, guid: 1ea60b21bf59ecd43a4ae83dcf6ad37d, type: 3}
-    volume: 0.01
+    clip: {fileID: 8300000, guid: 8681e9c7444df0f4ea0159d03fd512d9, type: 3}
+    volume: 0.1
     loop: 1
   playCardFromHand:
     clips:
-    - {fileID: 8300000, guid: da651fbd4ba57e446ab36406710a4dff, type: 3}
+    - {fileID: 8300000, guid: fc2c4001fb4b1ff4c91e6f1044554d32, type: 3}
+    - {fileID: 8300000, guid: 09dac7331e0f99249976195470ca8b72, type: 3}
+    - {fileID: 8300000, guid: a177731f0c86cdc48b4d8f9bcd7be606, type: 3}
     volume: 1
     pitchMin: 1
     pitchMax: 1
   drawCard:
     clips:
-    - {fileID: 8300000, guid: d7ce78416593e5747b6aa9558731896e, type: 3}
+    - {fileID: 8300000, guid: 1a447775b02a2c64589ee416a97240ed, type: 3}
+    - {fileID: 8300000, guid: b648d5b3d32f0c745b64123ada77cf2f, type: 3}
+    - {fileID: 8300000, guid: 86d06ab68847a6d4fb9fb52643acf5ee, type: 3}
     volume: 1
     pitchMin: 1
     pitchMax: 1
   yourTurnStart:
     clips:
-    - {fileID: 8300000, guid: 494238ae59459b5479e6f5da822f8ef1, type: 3}
+    - {fileID: 8300000, guid: b6b1734262a10ec49ad0e51fc9adf22d, type: 3}
     volume: 1
     pitchMin: 1
     pitchMax: 1
   yourTurnTimeout:
     clips:
-    - {fileID: 8300000, guid: 93fd029a816cfe345818e18b8194b631, type: 3}
+    - {fileID: 8300000, guid: 40d588bd03a9f36449ce8ee17be1eeb7, type: 3}
     volume: 1
     pitchMin: 1
     pitchMax: 1
   throwBlockCard:
     clips:
-    - {fileID: 8300000, guid: 96340438f19e3bd49b1619ce44421a93, type: 3}
+    - {fileID: 8300000, guid: db7bfb6540e3df84e8be06bc81993bb8, type: 3}
+    - {fileID: 8300000, guid: 21433ac04e3170e45a2d5306e344bf62, type: 3}
+    - {fileID: 8300000, guid: e3279b46b3189b54087c942206097d55, type: 3}
     volume: 1
     pitchMin: 1
     pitchMax: 1
   throwPlusCard:
     clips:
-    - {fileID: 8300000, guid: 234ded1d196e291488c2eb0605ca2902, type: 3}
+    - {fileID: 8300000, guid: b99a383ca314241468d050464f0bd526, type: 3}
+    - {fileID: 8300000, guid: f9da71e271e99fc41ad0725711896cd0, type: 3}
     volume: 1
     pitchMin: 1
     pitchMax: 1
   throwReverseCard:
     clips:
-    - {fileID: 8300000, guid: 96340438f19e3bd49b1619ce44421a93, type: 3}
+    - {fileID: 8300000, guid: 7c9276e949e276f4ea4e658020f96288, type: 3}
+    - {fileID: 8300000, guid: ce0405a5c764530488e90d79f4d8dce7, type: 3}
     volume: 1
     pitchMin: 1
     pitchMax: 1
   gameEndWinner:
     clips:
-    - {fileID: 8300000, guid: 271370f5a9b89a74881d0fd005b22900, type: 3}
+    - {fileID: 8300000, guid: f1c274ccda8d75e4cbe92766c603a380, type: 3}
     volume: 1
     pitchMin: 1
     pitchMax: 1

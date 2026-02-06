@@ -13,24 +13,24 @@ MonoBehaviour:
   m_Name: _AudioMenuLibrary
   m_EditorClassIdentifier: Assembly-CSharp::AudioMenuLibrarySO
   mainMenuLoop:
-    clip: {fileID: 8300000, guid: 80e55204badcd7a47961aa7262b00f8f, type: 3}
-    volume: 0.1
+    clip: {fileID: 8300000, guid: 854defb9fc2b78b47852d51193b0a7a8, type: 3}
+    volume: 0.2
     loop: 1
   uiHighlightButton:
     clips:
-    - {fileID: 8300000, guid: 326740c2657018f4597a25a89d18ae7f, type: 3}
+    - {fileID: 8300000, guid: 11eb15121e4fc5d45ab2a7a0b75ecf6f, type: 3}
     volume: 1
     pitchMin: 1
     pitchMax: 1
   uiClickButton:
     clips:
-    - {fileID: 8300000, guid: e098a648d84e50146aabad6d95660916, type: 3}
+    - {fileID: 8300000, guid: 6f7282f1f2c6eea4c9cc522f1dcdc962, type: 3}
     volume: 1
     pitchMin: 1
     pitchMax: 1
   uiClickReadyButton:
     clips:
-    - {fileID: 8300000, guid: c1d489ae608143c40abe4df3e0343423, type: 3}
+    - {fileID: 8300000, guid: ec0bd84c69146764f84afea1ff7d84e1, type: 3}
     volume: 1
     pitchMin: 1
     pitchMax: 1
