@@ -1,5 +1,6 @@
 using PurrNet;
 using System.Collections.Generic;
+using System.Linq;
 using TMPro;
 using UnityEngine;
 
@@ -77,6 +78,25 @@ public class OpponentHandsView : MonoBehaviour
             if (anchor == null) continue;
 
             RenderOpponent(pid, anchor, counts[i]);
+        }
+
+        var alive = new HashSet<PlayerID>(playerIds);
+        alive.Remove((PlayerID)localId);
+
+        foreach (var pid in spawnedBacks.Keys.ToArray())
+        {
+            if (!alive.Contains(pid))
+            {
+                foreach (var go in spawnedBacks[pid])
+                    if (go != null) Destroy(go);
+
+                spawnedBacks.Remove(pid);
+
+                if (spawnedTexts.TryGetValue(pid, out var txt) && txt != null)
+                    Destroy(txt.gameObject);
+
+                spawnedTexts.Remove(pid);
+            }
         }
     }
 

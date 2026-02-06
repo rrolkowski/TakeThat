@@ -384,7 +384,7 @@ namespace PurrLobby
         private async void CallOnAllReady()
         {
             await WaitForAllTasksAsync();
-            if(_currentLobby.IsValid && _currentLobby.Members.TrueForAll(x => x.IsReady))
+            if(_currentLobby.IsValid && _currentLobby.Members.TrueForAll(x => x.IsReady && _currentLobby.Members.Count >= 2))
             {
                 await _currentProvider.SetAllReadyAsync();
 

@@ -2,6 +2,7 @@ using PurrNet;
 using Steamworks;
 using TMPro;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
 public class GameOverPopup : MonoBehaviour
@@ -71,7 +72,13 @@ public class GameOverPopup : MonoBehaviour
         GameSession.Instance?.Server_VoteReset(votedReset);
     }
     public void OnLobbyClicked() => GameSession.Instance.Server_ReturnToLobby();
-    public void OnLeaveCliced() => UnityEngine.SceneManagement.SceneManager.LoadScene("LobbySample");
+    public void OnLeaveCliced()
+    {
+        var nm = NetworkManager.main;
+        if (nm != null && nm.isClient)
+            nm.StopClient();
+        SceneManager.LoadScene("LobbySample");
+    }
 
     public void Hide()
     {

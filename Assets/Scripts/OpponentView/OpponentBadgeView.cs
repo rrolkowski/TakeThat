@@ -1,7 +1,8 @@
-using System.Collections.Generic;
 using PurrNet;
-using UnityEngine;
 using Steamworks;
+using System.Collections.Generic;
+using System.Linq;
+using UnityEngine;
 
 public class OpponentBadgesView : MonoBehaviour
 {
@@ -79,6 +80,18 @@ public class OpponentBadgesView : MonoBehaviour
             badge.transform.localPosition = Vector3.zero;
             badge.transform.localRotation = Quaternion.identity;
             badge.gameObject.SetActive(true);
+        }
+
+        var alive = new HashSet<PlayerID>(playerIds);
+        alive.Remove((PlayerID)localId);
+
+        foreach (var pid in badges.Keys.ToArray())
+        {
+            if (!alive.Contains(pid))
+            {
+                if (badges[pid] != null) Destroy(badges[pid].gameObject);
+                badges.Remove(pid);
+            }
         }
     }
 

@@ -106,6 +106,9 @@ public class GameSession : NetworkBehaviour
     private int clientPendingDraw;
     private bool clientReactionActive;
 
+    private float _nextLeaverCheck;
+    private readonly HashSet<PlayerID> _known = new();
+
     private void Awake()
     {
         if (Instance != null && Instance != this)
@@ -198,9 +201,9 @@ public class GameSession : NetworkBehaviour
         Observers_CardPlayed(seatIndex, card, 1, pileIndex, seed);
 
         // od razu aktualizujemy rękę i stan publiczny (żeby wszyscy widzieli topCard i liczniki)
-        Target_SetHand(pid, hand.ToArray());
         Server_RecalcHandCounts();
         Server_BroadcastPublicState();
+        Target_SetHand(pid, hand.ToArray());
 
         // ===== jeśli to była ostatnia karta: NIE wykonuj efektu =====
         if (willWin)
@@ -434,6 +437,9 @@ public class GameSession : NetworkBehaviour
 
         Observers_ReturnToLobby();
 
+        if (nm != null && nm.isServer)
+            nm.StopServer();
+
         nm.sceneModule.LoadSceneAsync(lobbySceneName);
     }
 
@@ -462,6 +468,12 @@ public class GameSession : NetworkBehaviour
     {
         if (NetworkManager.main == null || !NetworkManager.main.isServer) return;
         if (!started) return;
+
+        if (Time.time >= _nextLeaverCheck)
+        {
+            _nextLeaverCheck = Time.time + 0.5f;
+            Server_CheckLeavers();
+        }
 
         if (draw3ReactionActive && Time.time >= draw3ReactionEndsAt)
         {
@@ -584,6 +596,7 @@ public class GameSession : NetworkBehaviour
         OpponentHandsView.Instance?.SetCounts(playerIds, counts);
         OpponentBadgesView.Instance?.SetPlayers(playerIds, counts);
         PlayerEffectView.Instance?.SetPlayers(playerIds);
+        RoundTimerUI.Instance?.SetState(turnTimeLeft, turnSeconds, turnTransition);
 
         if (effectId != 0 && effectId != clientLastEffectId)
         {
@@ -608,6 +621,8 @@ public class GameSession : NetworkBehaviour
         {
             LocalHandView.Instance?.RefreshDrawIndicator();
         }
+
+
 
         // ========= TURN START (global) =========
         // Chcemy odpalić, kiedy tura "staje się aktywna":
@@ -648,6 +663,111 @@ public class GameSession : NetworkBehaviour
         Observers_PublicStateChanged(topCard, currentTurn, direction, pids, counts, pendingDraw, draw3ReactionActive, draw3TimeLeft, draw3ReactionSeconds,
             lastEffectId, lastEffectTarget, lastEffectType, lastEffectValue, turnTimeLeft, turnSeconds, advanceScheduled);
     }
+
+    private void Server_CheckLeavers()
+    {
+        _known.Clear();
+        foreach (var pid in PlayerAvatar.allPlayers.Keys)
+            _known.Add(pid);
+
+        for (int i = turnOrder.Count - 1; i >= 0; i--)
+        {
+            var pid = turnOrder[i];
+            if (!_known.Contains(pid))
+                Server_HandlePlayerLeft(pid);
+        }
+    }
+
+    private void Server_HandlePlayerLeft(PlayerID pid)
+    {
+        resetVotes.Remove(pid);
+
+        bool wasInGame =
+            turnOrder.Contains(pid) ||
+            hands.ContainsKey(pid) ||
+            handCounts.ContainsKey(pid);
+
+        if (!wasInGame) return;
+
+        hands.Remove(pid);
+        handCounts.Remove(pid);
+
+        int leftIndex = turnOrder.IndexOf(pid);
+        if (leftIndex >= 0)
+            turnOrder.RemoveAt(leftIndex);
+
+        if (!started || gameOver)
+        {
+            Server_RecalcHandCounts();
+            Server_BroadcastPublicState();
+            return;
+        }
+
+        if (lastEffectTarget == pid)
+        {
+            pendingDraw = 0;
+            draw3ReactionActive = false;
+        }
+
+        if (turnOrder.Count == 1)
+        {
+            Server_DeclareWinner(turnOrder[0]);
+            return;
+        }
+
+        if (turnOrder.Count > 0)
+            turnIndex %= turnOrder.Count;
+
+        if (pid == currentTurn)
+        {
+            advanceScheduled = false;
+            Server_StopTurnTimer();
+
+            currentTurn = GetCurrentTurn();
+            Server_StartTurnTimer();
+            Server_StartDraw3ReactionIfPossible();
+        }
+
+        Server_RecalcHandCounts();
+        Server_BroadcastPublicState();
+    }
+
+    private void Server_DeclareWinner(PlayerID pid)
+    {
+        if (gameOver) return;
+
+        resetVotes.Clear();
+        Server_BroadcastResetVotes();
+
+        gameOver = true;
+        winnerPid = pid;
+
+        advanceScheduled = false;
+        Server_StopTurnTimer();
+        draw3ReactionActive = false;
+        pendingDraw = 0;
+
+        string name = "Winner";
+        ulong steamId = 0;
+
+        if (PlayerAvatar.allPlayers.TryGetValue(pid, out var avatar) && avatar != null)
+        {
+            name = avatar.DisplayName;
+            steamId = avatar.SteamId;
+        }
+
+        int winnerSeat = GetSeatIndexForPid(pid);
+        Observers_GameOverStart(winnerSeat);
+
+        gameOverScheduled = true;
+        gameOverAt = Time.time + gameOverPopupDelay;
+        scheduledWinnerName = name;
+        scheduledWinnerSteamId = steamId;
+
+        if (autoReturnToLobbyOnGameOver)
+            Server_ReturnToLobby();
+    }
+
 
     private bool Server_PlayerHasDraw3(PlayerID pid)
     {

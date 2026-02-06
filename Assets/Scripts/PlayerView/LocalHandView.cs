@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 
 public class LocalHandView : MonoBehaviour
@@ -8,6 +9,9 @@ public class LocalHandView : MonoBehaviour
     [SerializeField] private CardSpriteDB spriteDb;
 
     private CardId[] currentHand = System.Array.Empty<CardId>();
+
+    private Coroutine _refreshRoutine;
+    private int _handRevision;
 
     private void Awake()
     {
@@ -20,10 +24,33 @@ public class LocalHandView : MonoBehaviour
         currentHand = hand;
         fan.SetHand(hand, spriteDb.GetSprite);
 
-        if (GameSession.Instance != null && GameSession.Instance.IsTurnTransition)
+        DrawPileIndicator.Instance?.SetVisible(false);
+
+        _handRevision++;
+
+        if (_refreshRoutine != null)
+            StopCoroutine(_refreshRoutine);
+
+        _refreshRoutine = StartCoroutine(RefreshWhenStateSettles(_handRevision));
+    }
+
+    private IEnumerator RefreshWhenStateSettles(int revision)
+    {
+        for (int i = 0; i < 5; i++)
         {
-            DrawPileIndicator.Instance?.SetVisible(false);
-            return;
+            yield return null;
+
+            if (revision != _handRevision)
+                yield break;
+
+            if (GameSession.Instance == null)
+                yield break;
+
+            if (GameSession.Instance.IsTurnTransition || !GameSession.Instance.IsMyTurn() || GameSession.Instance.IsGameOverClient)
+            {
+                DrawPileIndicator.Instance?.SetVisible(false);
+                yield break;
+            }
         }
 
         RefreshDrawIndicator();
@@ -47,7 +74,6 @@ public class LocalHandView : MonoBehaviour
         }
 
         bool canPlay = HasAnyPlayableCard(currentHand, GameSession.Instance.TopCard);
-
         DrawPileIndicator.Instance.SetVisible(!canPlay);
     }
 

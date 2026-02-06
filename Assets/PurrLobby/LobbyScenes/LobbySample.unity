@@ -2572,19 +2572,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   currentProvider: {fileID: 1097043114}
   createRoomArgs:
-    maxPlayers: 5
+    maxPlayers: 4
     roomProperties:
       keys:
-      - PurrNet
+      - Take
       values:
-      - IsTheBest
+      - That
       stringKeys: []
       stringValues: []
   searchRoomArgs:
     keys:
-    - PurrNet
+    - Take
     values:
-    - IsTheBest
+    - That
     stringKeys: []
     stringValues: []
   OnRoomJoined:

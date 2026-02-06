@@ -69,6 +69,9 @@ public class PauseMenu : MonoBehaviour
     // KLIENT
     public void OnLeaveGameClicked()
     {
+        var nm = NetworkManager.main;
+        if (nm != null && nm.isClient)
+            nm.StopClient();
         SceneManager.LoadScene(lobbySceneName);
     }
 
