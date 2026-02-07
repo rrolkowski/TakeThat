@@ -22,18 +22,6 @@ public class SeatManager : NetworkBehaviour
     {
         if (!isServer) return;
 
-        var knownNow = new HashSet<PlayerID>(PlayerAvatar.allPlayers.Keys);
-
-        foreach (var pid in assigned.Keys.ToArray())
-        {
-            if (!knownNow.Contains(pid))
-            {
-                int seat = assigned[pid];
-                assigned.Remove(pid);
-                if (seat >= 0 && seat < taken.Length) taken[seat] = false;
-            }
-        }
-
         foreach (var kv in PlayerAvatar.allPlayers)
         {
             var playerId = kv.Key;

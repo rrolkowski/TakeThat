@@ -34,7 +34,7 @@ MonoBehaviour:
     pitchMax: 1
   yourTurnStart:
     clips:
-    - {fileID: 8300000, guid: b6b1734262a10ec49ad0e51fc9adf22d, type: 3}
+    - {fileID: 8300000, guid: 494238ae59459b5479e6f5da822f8ef1, type: 3}
     volume: 1
     pitchMin: 1
     pitchMax: 1
